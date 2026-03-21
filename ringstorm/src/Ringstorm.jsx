@@ -13,6 +13,7 @@ export default function Game() {
   const [np, setNp] = useState(1);
   const [hd, setHd] = useState({});
   const [ed, setEd] = useState(null);
+  const [cr, setCr] = useState(0);
 
   function go(m, n) { setGm(m); setNp(n); setEd(null); setSc(m); }
 
@@ -27,10 +28,11 @@ export default function Game() {
 
     // Course gates
     const crs = [];
+    const baseY = cr === 1 ? 220 : 180;
     if (!iB) {
       for (let i = 0; i < NG; i++) {
         const a = (i / NG) * Math.PI * 2;
-        crs.push({ x: Math.cos(a) * 1200 + Math.cos(a * 2) * 60, y: 180 + Math.sin(a * 2 + 1) * 30, z: Math.sin(a) * 1200 + Math.sin(a * 3) * 50, sz: 55 });
+        crs.push({ x: Math.cos(a) * 1200 + Math.cos(a * 2) * 60, y: baseY + Math.sin(a * 2 + 1) * 30, z: Math.sin(a) * 1200 + Math.sin(a * 3) * 50, sz: 55 });
       }
     }
 
@@ -51,7 +53,7 @@ export default function Game() {
       return tH[ix][iz] * (1 - fx) * (1 - fz) + (tH[ix + 1]?.[iz] ?? tH[ix][iz]) * fx * (1 - fz) + (tH[ix]?.[iz + 1] ?? tH[ix][iz]) * (1 - fx) * fz + (tH[ix + 1]?.[iz + 1] ?? tH[ix][iz]) * fx * fz;
     }
 
-    // Mountains (battle mode only)
+    // Mountains
     const mts = [];
     if (iB) {
       for (let i = 0; i < 6; i++) {
@@ -60,11 +62,61 @@ export default function Game() {
         mts.push({ x: mx, z: mz, bY: gH(mx, mz), ht: 150 + Math.random() * 170, w: 50 + Math.random() * 55 });
       }
     }
+    // Course 0 (Grand Canyon): distant background mountains
+    if (!iB && cr === 0 && crs.length > 1) {
+      for (let i = 0; i < 5; i++) {
+        const gi = Math.floor(Math.random() * NG);
+        const g = crs[gi];
+        const a = Math.atan2(g.z, g.x) + (Math.random() - 0.5) * 0.5;
+        const d = 350 + Math.random() * 200;
+        const mx = g.x + Math.cos(a) * d, mz = g.z + Math.sin(a) * d;
+        mts.push({ x: mx, z: mz, bY: gH(mx, mz), ht: 200 + Math.random() * 150, w: 60 + Math.random() * 50 });
+      }
+    }
+    // Course 2 (Mountain Pass): clusters of mountains close to track
+    if (!iB && cr === 2 && crs.length > 1) {
+      for (let gi = 0; gi < NG; gi++) {
+        const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
+        const dx = g2.x - g1.x, dz = g2.z - g1.z;
+        const len = Math.sqrt(dx * dx + dz * dz) || 1;
+        const px = -dz / len, pz = dx / len;
+        const nmt = 2 + Math.floor(Math.random() * 2);
+        for (let j = 0; j < nmt; j++) {
+          const t = 0.2 + Math.random() * 0.6;
+          const cx = g1.x + dx * t, cz = g1.z + dz * t;
+          const side = Math.random() < 0.5 ? 1 : -1;
+          const off = 80 + Math.random() * 100;
+          const mx = cx + px * off * side + (Math.random() - 0.5) * 30;
+          const mz = cz + pz * off * side + (Math.random() - 0.5) * 30;
+          mts.push({ x: mx, z: mz, bY: gH(mx, mz), ht: 180 + Math.random() * 200, w: 40 + Math.random() * 40 });
+        }
+      }
+    }
+    // Course 1 (Island Skies): floating islands along the path
+    const islands = [];
+    if (!iB && cr === 1 && crs.length > 1) {
+      for (let gi = 0; gi < NG; gi++) {
+        const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
+        const dx = g2.x - g1.x, dz = g2.z - g1.z;
+        const len = Math.sqrt(dx * dx + dz * dz) || 1;
+        const px = -dz / len, pz = dx / len;
+        const ni = 1 + Math.floor(Math.random() * 2);
+        for (let j = 0; j < ni; j++) {
+          const t = 0.1 + Math.random() * 0.8;
+          const cx = g1.x + dx * t, cz = g1.z + dz * t;
+          const side = Math.random() < 0.5 ? 1 : -1;
+          const off = 60 + Math.random() * 120;
+          const ix = cx + px * off * side + (Math.random() - 0.5) * 40;
+          const iz = cz + pz * off * side + (Math.random() - 0.5) * 40;
+          islands.push({ x: ix, z: iz, y: 160 + Math.random() * 100, w: 30 + Math.random() * 40, h: 15 + Math.random() * 25 });
+        }
+      }
+    }
 
-    // Grand Canyon — continuous walls along course (race mode)
+    // Grand Canyon — continuous walls along course (Course 0 only)
     const canyon = [];
     const canyonL = [], canyonR = [];
-    if (!iB && crs.length > 1) {
+    if (!iB && cr === 0 && crs.length > 1) {
       let ord = 0;
       for (let gi = 2; gi <= 9 && gi < NG; gi++) {
         const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
@@ -88,8 +140,8 @@ export default function Game() {
         }
       }
     }
-    // Extra powerup rings inside the canyon
-    if (!iB && crs.length > 1) {
+    // Extra powerup rings inside the canyon (Course 0 only)
+    if (!iB && cr === 0 && crs.length > 1) {
       for (let i = 0; i < 10; i++) {
         const gi = 2 + Math.floor(Math.random() * 8);
         const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
@@ -163,6 +215,10 @@ export default function Game() {
       for (const c of canyon) {
         const d = Math.sqrt((r.x - c.x) ** 2 + (r.z - c.z) ** 2);
         if (d < c.w + 10 && r.y < c.bY + c.ht && r.y > c.bY) { boom(r); return 1; }
+      }
+      for (const il of islands) {
+        const d = Math.sqrt((r.x - il.x) ** 2 + (r.z - il.z) ** 2);
+        if (d < il.w + 8 && r.y < il.y + il.h / 2 && r.y > il.y - il.h / 2) { boom(r); return 1; }
       }
       if (r.y > 600) r.y = 600;
       return 0;
@@ -386,6 +442,34 @@ export default function Game() {
             x.globalAlpha = 1;
           }});
         });
+      });
+
+      // Floating islands (Course 1)
+      islands.forEach(il => {
+        const dist = Math.sqrt((il.x - vw.x) ** 2 + (il.z - vw.z) ** 2);
+        if (dist > 600) return;
+        const al = Math.max(0.3, 1 - dist / 600);
+        const pT = proj(il.x, il.y - il.h / 2, il.z, cam, vh);
+        const pB2 = proj(il.x, il.y + il.h / 2, il.z, cam, vh);
+        const pL = proj(il.x - il.w, il.y, il.z, cam, vh);
+        const pR = proj(il.x + il.w, il.y, il.z, cam, vh);
+        const pF = proj(il.x, il.y, il.z - il.w, cam, vh);
+        const pK = proj(il.x, il.y, il.z + il.w, cam, vh);
+        if (!pT || !pB2) return;
+        // Top face — green
+        if (pL && pF && pR && pK) {
+          rn.push({ d: pT.d, f() {
+            x.globalAlpha = al;
+            x.fillStyle = "rgb(50,120,45)";
+            x.beginPath(); x.moveTo(pL.sx, pT.sy); x.lineTo(pF.sx, pT.sy - (pF.sy - pT.sy) * 0.3); x.lineTo(pR.sx, pT.sy); x.lineTo(pK.sx, pT.sy + (pK.sy - pT.sy) * 0.3); x.closePath(); x.fill();
+            // Side faces — brown rock
+            x.fillStyle = "rgb(100,70,40)";
+            x.beginPath(); x.moveTo(pL.sx, pT.sy); x.lineTo(pL.sx, pB2.sy); x.lineTo(pF.sx, pB2.sy); x.lineTo(pF.sx, pT.sy - (pF.sy - pT.sy) * 0.3); x.closePath(); x.fill();
+            x.fillStyle = "rgb(80,55,30)";
+            x.beginPath(); x.moveTo(pF.sx, pT.sy - (pF.sy - pT.sy) * 0.3); x.lineTo(pF.sx, pB2.sy); x.lineTo(pR.sx, pB2.sy); x.lineTo(pR.sx, pT.sy); x.closePath(); x.fill();
+            x.globalAlpha = 1;
+          }});
+        }
       });
 
       // Canyon walls — 3D with front face + rim
@@ -712,7 +796,7 @@ export default function Game() {
     function loop() { mainUpdate(); render(); af.current = requestAnimationFrame(loop); }
     af.current = requestAnimationFrame(loop);
     return () => { if (af.current) cancelAnimationFrame(af.current); };
-  }, [sc, np]);
+  }, [sc, np, cr]);
 
   // Key listeners
   useEffect(() => {
@@ -749,12 +833,37 @@ export default function Game() {
       <h2 style={{ fontSize: "28px", fontWeight: 900, margin: "0 0 4px", color: gm === "race" ? "#fbbf24" : "#ef4444" }}>{gm === "race" ? "RACE" : "BATTLE"}</h2>
       <p style={{ fontSize: "12px", color: "#64748b", marginBottom: "24px" }}>{gm === "race" ? LAPS + " laps · Fly through gates" : "3 lives · Last plane flying"}</p>
       <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
-        <button onClick={() => go(gm, 1)} style={{ padding: "16px 32px", background: "linear-gradient(135deg,#3b82f6,#2563eb)", border: "none", borderRadius: "12px", color: "#fff", fontSize: "18px", fontWeight: 900, cursor: "pointer" }}>1 PLAYER</button>
-        <button onClick={() => go(gm, 2)} style={{ padding: "16px 32px", background: "linear-gradient(135deg,#ef4444,#dc2626)", border: "none", borderRadius: "12px", color: "#fff", fontSize: "18px", fontWeight: 900, cursor: "pointer" }}>2 PLAYER</button>
+        <button onClick={() => { setNp(1); if (gm === "race") setSc("coursePick"); else go(gm, 1); }} style={{ padding: "16px 32px", background: "linear-gradient(135deg,#3b82f6,#2563eb)", border: "none", borderRadius: "12px", color: "#fff", fontSize: "18px", fontWeight: 900, cursor: "pointer" }}>1 PLAYER</button>
+        <button onClick={() => { setNp(2); if (gm === "race") setSc("coursePick"); else go(gm, 2); }} style={{ padding: "16px 32px", background: "linear-gradient(135deg,#ef4444,#dc2626)", border: "none", borderRadius: "12px", color: "#fff", fontSize: "18px", fontWeight: 900, cursor: "pointer" }}>2 PLAYER</button>
       </div>
       <button onClick={() => setSc("menu")} style={{ padding: "8px 20px", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#64748b", fontSize: "12px", cursor: "pointer" }}>Back</button>
     </div>
   );
+
+  // COURSE PICK
+  if (sc === "coursePick") {
+    const courses = [
+      { name: "GRAND CANYON", desc: "Race through towering red rock canyon walls", color: "#f97316", emoji: "\u{1F3DC}\u{FE0F}" },
+      { name: "ISLAND SKIES", desc: "Weave between floating islands high above the clouds", color: "#22c55e", emoji: "\u{1F3DD}\u{FE0F}" },
+      { name: "MOUNTAIN PASS", desc: "Thread the needle between snow-capped peaks", color: "#3b82f6", emoji: "\u{1F3D4}\u{FE0F}" },
+    ];
+    return (
+      <div style={{ width: "100%", minHeight: "100vh", background: bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: ft, color: "#e2e8f0", padding: "20px", textAlign: "center" }}>
+        <h2 style={{ fontSize: "24px", fontWeight: 900, margin: "0 0 4px", color: "#fbbf24" }}>SELECT COURSE</h2>
+        <p style={{ fontSize: "11px", color: "#64748b", marginBottom: "20px" }}>{LAPS} laps · {np === 2 ? "2 players" : "1 player"}</p>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center", marginBottom: "20px", width: "min(560px,95vw)" }}>
+          {courses.map((c, i) => (
+            <button key={i} onClick={() => { setCr(i); go("race", np); }} style={{ padding: "16px", background: `linear-gradient(135deg,${c.color}18,${c.color}08)`, border: `2px solid ${c.color}55`, borderRadius: "14px", color: "#e2e8f0", cursor: "pointer", flex: "1", minWidth: "150px", textAlign: "center" }}>
+              <div style={{ fontSize: "32px", marginBottom: "6px" }}>{c.emoji}</div>
+              <div style={{ fontSize: "14px", fontWeight: 900, color: c.color, letterSpacing: "1px", marginBottom: "4px" }}>{c.name}</div>
+              <div style={{ fontSize: "10px", color: "#94a3b8", lineHeight: "1.4" }}>{c.desc}</div>
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setSc("pick")} style={{ padding: "8px 20px", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#64748b", fontSize: "12px", cursor: "pointer" }}>Back</button>
+      </div>
+    );
+  }
 
   // CONTROLS
   if (sc === "ctrl") return (
