@@ -75,13 +75,13 @@ export default function Game() {
           const dx = g2.x - g1.x, dz = g2.z - g1.z;
           const len = Math.sqrt(dx * dx + dz * dz) || 1;
           const px = -dz / len, pz = dx / len;
-          const off = 55 + (Math.random() - 0.5) * 20;
+          const off = 120 + (Math.random() - 0.5) * 30;
           const ht = 220 + Math.random() * 130;
           const w = 45 + Math.random() * 10;
           const lx = cx + px * off, lz = cz + pz * off;
           const rx = cx - px * off, rz = cz - pz * off;
-          const lw = { x: lx, z: lz, bY: gH(lx, lz), ht, w, side: 0, ord };
-          const rw = { x: rx, z: rz, bY: gH(rx, rz), ht, w, side: 1, ord };
+          const lw = { x: lx, z: lz, bY: gH(lx, lz), ht, w, side: 0, ord, px, pz };
+          const rw = { x: rx, z: rz, bY: gH(rx, rz), ht, w, side: 1, ord, px: -px, pz: -pz };
           canyon.push(lw); canyon.push(rw);
           canyonL.push(lw); canyonR.push(rw);
           ord++;
@@ -370,16 +370,18 @@ export default function Game() {
         });
       });
 
-      // Canyon walls — smooth connected quads
+      // Canyon walls — 3D with front face + rim
+      const rimD = 40;
       [canyonL, canyonR].forEach(side => {
         for (let i = 0; i < side.length - 1; i++) {
           const a = side[i], b = side[i + 1];
           const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
           const dist = Math.sqrt((mx - vw.x) ** 2 + (mz - vw.z) ** 2);
-          if (dist > 500) continue;
-          const al = Math.max(0.25, 1 - dist / 500);
+          if (dist > 600) continue;
+          const al = Math.max(0.25, 1 - dist / 600);
           const minB = Math.min(a.bY, b.bY), maxT = Math.max(a.bY + a.ht, b.bY + b.ht);
           const totalH = maxT - minB;
+          // Front face — layered rock
           const thirds = [[minB, minB + totalH / 3, 100, 55, 35], [minB + totalH / 3, minB + totalH * 2 / 3, 170, 80, 40], [minB + totalH * 2 / 3, maxT, 210, 140, 75]];
           thirds.forEach(([yB, yT, lr, lg, lb]) => {
             const cyB = Math.max(yB, Math.max(a.bY, b.bY));
@@ -397,6 +399,20 @@ export default function Game() {
               x.globalAlpha = 1;
             }});
           });
+          // Top rim face
+          const aTop = Math.max(a.bY + a.ht, b.bY + b.ht);
+          const aIT = proj(a.x, aTop, a.z, cam, vh);
+          const bIT = proj(b.x, aTop, b.z, cam, vh);
+          const aOT = proj(a.x + a.px * rimD, aTop, a.z + a.pz * rimD, cam, vh);
+          const bOT = proj(b.x + b.px * rimD, aTop, b.z + b.pz * rimD, cam, vh);
+          if (aIT && bIT && aOT && bOT) {
+            rn.push({ d: (aIT.d + bIT.d) / 2 - 1, f() {
+              x.globalAlpha = al;
+              x.fillStyle = "rgb(220,160,90)";
+              x.beginPath(); x.moveTo(aIT.sx, aIT.sy); x.lineTo(bIT.sx, bIT.sy); x.lineTo(bOT.sx, bOT.sy); x.lineTo(aOT.sx, aOT.sy); x.closePath(); x.fill();
+              x.globalAlpha = 1;
+            }});
+          }
         }
       });
 
