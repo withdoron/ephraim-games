@@ -14,8 +14,12 @@ export default function Game() {
   const [hd, setHd] = useState({});
   const [ed, setEd] = useState(null);
   const [cr, setCr] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [restartKey, setRestartKey] = useState(0);
+  const pauseRef = useRef(false);
+  pauseRef.current = paused;
 
-  function go(m, n) { setGm(m); setNp(n); setEd(null); setSc(m); }
+  function go(m, n) { setGm(m); setNp(n); setEd(null); setPaused(false); setSc(m); }
 
   // Game engine
   useEffect(() => {
@@ -913,6 +917,12 @@ export default function Game() {
     }
 
     function mainUpdate() {
+      if (ky.current["KeyP"] && !ky.current._pauseCD) {
+        ky.current._pauseCD = true;
+        setTimeout(() => { ky.current._pauseCD = false; }, 300);
+        setPaused(p => !p);
+      }
+      if (pauseRef.current) return;
       if (cd > 0) { cd--; fc++; return; }
       if (!started) { started = 1; rs.forEach(r => { r.th = 1; r.sp = 1; }); }
       rt++;
@@ -979,11 +989,11 @@ export default function Game() {
     function loop() { mainUpdate(); render(); af.current = requestAnimationFrame(loop); }
     af.current = requestAnimationFrame(loop);
     return () => { if (af.current) cancelAnimationFrame(af.current); };
-  }, [sc, np, cr]);
+  }, [sc, np, cr, restartKey]);
 
   // Key listeners
   useEffect(() => {
-    const dn = (e) => { ky.current[e.code] = true; if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Slash", "Period", "ShiftRight"].includes(e.code)) e.preventDefault(); };
+    const dn = (e) => { ky.current[e.code] = true; if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Slash", "Period", "ShiftRight", "KeyP"].includes(e.code)) e.preventDefault(); };
     const up = (e) => { ky.current[e.code] = false; };
     window.addEventListener("keydown", dn);
     window.addEventListener("keyup", up);
@@ -1138,6 +1148,17 @@ export default function Game() {
           {w2 && <div style={{ background: "rgba(0,0,0,0.5)", padding: "2px 4px", borderRadius: "4px", border: "1px solid " + w2.c, color: w2.c, fontWeight: 700 }}>{w2.e}</div>}
           {hd.p2?.sa && <span style={{ color: "#fbbf24" }}>⭐</span>}
           {hd.p2?.ba && <span style={{ color: "#22c55e" }}>🚀</span>}
+        </div>
+      )}
+      {paused && (
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.75)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: ft, zIndex: 50 }}>
+          <h2 style={{ fontSize: "36px", fontWeight: 900, color: "#e2e8f0", marginBottom: "32px" }}>PAUSED</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "200px" }}>
+            <button onClick={() => setPaused(false)} style={{ padding: "14px", background: "linear-gradient(135deg, #22c55e, #16a34a)", border: "none", borderRadius: "10px", color: "#fff", fontSize: "16px", fontWeight: 900, cursor: "pointer" }}>RESUME</button>
+            <button onClick={() => { setPaused(false); setRestartKey(k => k + 1); }} style={{ padding: "14px", background: "linear-gradient(135deg, #f59e0b, #d97706)", border: "none", borderRadius: "10px", color: "#fff", fontSize: "16px", fontWeight: 900, cursor: "pointer" }}>RESTART</button>
+            <button onClick={() => { setPaused(false); setSc("menu"); }} style={{ padding: "14px", background: "linear-gradient(135deg, #ef4444, #dc2626)", border: "none", borderRadius: "10px", color: "#fff", fontSize: "16px", fontWeight: 900, cursor: "pointer" }}>MAIN MENU</button>
+          </div>
+          <p style={{ fontSize: "10px", color: "#64748b", marginTop: "16px" }}>Press P to resume</p>
         </div>
       )}
     </div>
