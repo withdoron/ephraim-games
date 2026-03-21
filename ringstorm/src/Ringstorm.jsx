@@ -231,7 +231,7 @@ export default function Game() {
       { id: "n3", nm: "STORM", ac: "#a855f7", cp: "#c084fc", sc: "#1a1a1a", npc: 1 },
     ];
     const ads = iB ? (i2 ? defs.slice(0, 2) : [defs[0], defs[2]]) : (i2 ? defs : [defs[0], ...defs.slice(2)]);
-    const startY = cr === 3 ? 100 : 200;
+    const startY = cr === 3 ? 100 : cr === 1 ? 230 : 200;
     const sp = iB ? { x: 0, y: 200, z: 0 } : (crs[0] ? { ...crs[0], y: startY } : { x: 0, y: startY, z: 0 });
     const sd = (!iB && crs.length > 1) ? Math.atan2(crs[0].x - crs[NG - 1].x, crs[0].z - crs[NG - 1].z) : 0;
 
@@ -536,38 +536,41 @@ export default function Game() {
       });
 
       // Floating islands (Course 1)
+      // World Y: higher = higher on screen (smaller sy). Grass top = highest Y, stalactite = lowest Y.
       islands.forEach(il => {
         const dist = Math.sqrt((il.x - vw.x) ** 2 + (il.z - vw.z) ** 2);
         if (dist > 600) return;
         const al = Math.max(0.3, 1 - dist / 600);
-        const topY = il.y - il.h / 2;
-        const botY = il.y + il.h * 1.0;
-        const pC = proj(il.x, topY, il.z, cam, vh);
-        const pBot = proj(il.x, botY, il.z, cam, vh);
-        const pL = proj(il.x - il.w, topY + il.h * 0.15, il.z, cam, vh);
-        const pR = proj(il.x + il.w, topY + il.h * 0.15, il.z, cam, vh);
-        if (!pC || !pBot || !pL || !pR) return;
+        const grassY = il.y + il.h / 2;       // top of island (high world Y → high on screen)
+        const pointY = il.y - il.h * 1.0;     // stalactite tip (low world Y → low on screen)
+        const edgeY = il.y;                    // middle where edges are
+        const pGrass = proj(il.x, grassY, il.z, cam, vh);
+        const pPoint = proj(il.x, pointY, il.z, cam, vh);
+        const pL = proj(il.x - il.w, edgeY, il.z, cam, vh);
+        const pR = proj(il.x + il.w, edgeY, il.z, cam, vh);
+        if (!pGrass || !pPoint || !pL || !pR) return;
         const sw = Math.abs(pR.sx - pL.sx);
-        rn.push({ d: pC.d, f() {
+        // On screen: pGrass.sy < pL.sy < pPoint.sy (grass highest, point lowest)
+        rn.push({ d: pGrass.d, f() {
           x.globalAlpha = al;
-          // Pointy rock bottom — stalactite shape
+          // Pointy rock bottom — stalactite shape (drawn first, behind everything)
           x.fillStyle = "rgb(80,55,35)";
-          x.beginPath(); x.moveTo(pL.sx, pL.sy); x.lineTo(pC.sx, pBot.sy); x.lineTo(pR.sx, pR.sy); x.closePath(); x.fill();
-          // Rock middle layer — wider band
-          const midY = pL.sy + (pBot.sy - pL.sy) * 0.3;
+          x.beginPath(); x.moveTo(pL.sx, pL.sy); x.lineTo(pGrass.sx, pPoint.sy); x.lineTo(pR.sx, pR.sy); x.closePath(); x.fill();
+          // Rock middle layer — wider band above the point
+          const midSy = pL.sy + (pPoint.sy - pL.sy) * 0.3;
           x.fillStyle = "rgb(120,80,50)";
-          x.beginPath(); x.moveTo(pL.sx, pL.sy); x.lineTo(pL.sx + sw * 0.15, midY); x.lineTo(pR.sx - sw * 0.15, midY); x.lineTo(pR.sx, pR.sy); x.closePath(); x.fill();
-          // Dirt layer — thin band at top of rock
+          x.beginPath(); x.moveTo(pL.sx, pL.sy); x.lineTo(pL.sx + sw * 0.15, midSy); x.lineTo(pR.sx - sw * 0.15, midSy); x.lineTo(pR.sx, pR.sy); x.closePath(); x.fill();
+          // Dirt layer — thin band just below the grass
           x.fillStyle = "rgb(90,65,40)";
-          const dirtH = Math.max(2, (pBot.sy - pC.sy) * 0.08);
-          x.beginPath(); x.ellipse(pC.sx, pL.sy - dirtH, sw / 2, dirtH, 0, 0, Math.PI * 2); x.fill();
-          // Grass top — green ellipse
+          const dirtH = Math.max(2, Math.abs(pPoint.sy - pGrass.sy) * 0.06);
+          x.beginPath(); x.ellipse(pGrass.sx, pL.sy, sw / 2, dirtH, 0, 0, Math.PI * 2); x.fill();
+          // Grass top — green ellipse at the top
           x.fillStyle = "rgb(60,140,40)";
-          const grassH = Math.max(3, (pBot.sy - pC.sy) * 0.12);
-          x.beginPath(); x.ellipse(pC.sx, pC.sy, sw / 2, grassH, 0, 0, Math.PI * 2); x.fill();
+          const grassH = Math.max(3, Math.abs(pPoint.sy - pGrass.sy) * 0.1);
+          x.beginPath(); x.ellipse(pGrass.sx, pGrass.sy, sw / 2, grassH, 0, 0, Math.PI * 2); x.fill();
           x.strokeStyle = "rgb(45,110,30)"; x.lineWidth = 1;
-          x.beginPath(); x.ellipse(pC.sx, pC.sy, sw / 2, grassH, 0, 0, Math.PI * 2); x.stroke();
-          // Trees — if big enough on screen
+          x.beginPath(); x.ellipse(pGrass.sx, pGrass.sy, sw / 2, grassH, 0, 0, Math.PI * 2); x.stroke();
+          // Trees — on top of the grass (even higher on screen = smaller sy)
           if (sw > 16) {
             const treeCols = ["rgb(40,120,30)", "rgb(55,145,40)", "rgb(35,100,25)"];
             const trunkH = sw * 0.18;
@@ -575,9 +578,9 @@ export default function Game() {
             const treePositions = [-0.25, 0.05, 0.3];
             for (let ti = 0; ti < 3; ti++) {
               if (sw < 30 && ti === 2) break;
-              const tx = pC.sx + treePositions[ti] * sw;
-              const tBase = pC.sy - grassH * 0.5;
-              // Trunk
+              const tx = pGrass.sx + treePositions[ti] * sw;
+              const tBase = pGrass.sy;
+              // Trunk — grows upward (decreasing sy)
               x.fillStyle = "rgb(90,60,30)"; x.fillRect(tx - 1, tBase - trunkH, 2, trunkH);
               // Canopy
               x.fillStyle = treeCols[ti]; x.beginPath(); x.arc(tx, tBase - trunkH - canR * 0.5, canR, 0, Math.PI * 2); x.fill();
