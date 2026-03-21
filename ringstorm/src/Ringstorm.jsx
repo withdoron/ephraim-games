@@ -36,8 +36,8 @@ export default function Game() {
 
     // Powerup rings
     const br = [];
-    for (let i = 0; i < (iB ? 16 : 8); i++) {
-      const a = (i / (iB ? 16 : 8)) * Math.PI * 2, r = iB ? 200 + Math.random() * 350 : 300 + Math.random() * 500;
+    for (let i = 0; i < (iB ? 16 : 20); i++) {
+      const a = (i / (iB ? 16 : 20)) * Math.PI * 2, r = iB ? 200 + Math.random() * 350 : 300 + Math.random() * 500;
       br.push({ x: Math.cos(a) * r + (Math.random() - 0.5) * 120, y: 140 + Math.random() * 160, z: Math.sin(a) * r + (Math.random() - 0.5) * 120, sz: 25, cl: 0, rt: 0 });
     }
 
@@ -76,7 +76,7 @@ export default function Game() {
           const len = Math.sqrt(dx * dx + dz * dz) || 1;
           const px = -dz / len, pz = dx / len;
           const off = 120 + (Math.random() - 0.5) * 30;
-          const ht = 220 + Math.random() * 130;
+          const ht = 250 + Math.sin(ord * 0.3) * 50;
           const w = 45 + Math.random() * 10;
           const lx = cx + px * off, lz = cz + pz * off;
           const rx = cx - px * off, rz = cz - pz * off;
@@ -86,6 +86,17 @@ export default function Game() {
           canyonL.push(lw); canyonR.push(rw);
           ord++;
         }
+      }
+    }
+    // Extra powerup rings inside the canyon
+    if (!iB && crs.length > 1) {
+      for (let i = 0; i < 10; i++) {
+        const gi = 2 + Math.floor(Math.random() * 8);
+        const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
+        const t = Math.random();
+        const rx = g1.x + (g2.x - g1.x) * t + (Math.random() - 0.5) * 80;
+        const rz = g1.z + (g2.z - g1.z) * t + (Math.random() - 0.5) * 80;
+        br.push({ x: rx, y: 160 + Math.random() * 60, z: rz, sz: 25, cl: 0, rt: 0 });
       }
     }
 
@@ -564,7 +575,7 @@ export default function Game() {
       rt++;
 
       const pl = rs.filter(r => !r.npc);
-      if (pl[0]) updatePlayer(pl[0], cm[0], ky.current, "KeyW", "KeyS", "KeyA", "KeyD", "Space", "KeyQ", "KeyF");
+      if (pl[0]) updatePlayer(pl[0], cm[0], ky.current, "KeyW", "KeyS", "KeyA", "KeyD", "Space", "KeyQ", "Space");
       if (pl[1] && i2) updatePlayer(pl[1], cm[1], ky.current, "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Slash", "Period", "ShiftRight");
       rs.filter(r => r.npc).forEach(r => updateNPC(r));
 
@@ -680,7 +691,7 @@ export default function Game() {
             <div><b style={{ color: "#e2e8f0" }}>W</b> Rise</div>
             <div><b style={{ color: "#e2e8f0" }}>S</b> Dive</div>
             <div><b style={{ color: "#e2e8f0" }}>A/D</b> Turn</div>
-            <div><b style={{ color: "#e2e8f0" }}>F</b> Weapon</div>
+            <div><b style={{ color: "#e2e8f0" }}>Space</b> Weapon</div>
           </div>
         </div>
         <div style={{ background: "rgba(0,0,0,0.25)", borderRadius: "12px", padding: "16px 20px", border: "2px solid #ef444444", flex: "1", minWidth: "180px", textAlign: "left" }}>
