@@ -63,23 +63,28 @@ export default function Game() {
 
     // Grand Canyon — continuous walls along course (race mode)
     const canyon = [];
+    const canyonL = [], canyonR = [];
     if (!iB && crs.length > 1) {
+      let ord = 0;
       for (let gi = 2; gi <= 9 && gi < NG; gi++) {
         const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
         const steps = 8;
         for (let s = 0; s < steps; s++) {
           const t = s / steps;
-          const cx = g1.x + (g2.x - g1.x) * t, cz = g1.z + (g2.z - g1.z) * t, cy = g1.y + (g2.y - g1.y) * t;
+          const cx = g1.x + (g2.x - g1.x) * t, cz = g1.z + (g2.z - g1.z) * t;
           const dx = g2.x - g1.x, dz = g2.z - g1.z;
           const len = Math.sqrt(dx * dx + dz * dz) || 1;
           const px = -dz / len, pz = dx / len;
           const off = 55 + (Math.random() - 0.5) * 20;
-          const ht = 180 + Math.random() * 100;
-          const w = 25 + Math.random() * 10;
+          const ht = 220 + Math.random() * 130;
+          const w = 45 + Math.random() * 10;
           const lx = cx + px * off, lz = cz + pz * off;
           const rx = cx - px * off, rz = cz - pz * off;
-          canyon.push({ x: lx, z: lz, bY: gH(lx, lz), ht, w });
-          canyon.push({ x: rx, z: rz, bY: gH(rx, rz), ht, w });
+          const lw = { x: lx, z: lz, bY: gH(lx, lz), ht, w, side: 0, ord };
+          const rw = { x: rx, z: rz, bY: gH(rx, rz), ht, w, side: 1, ord };
+          canyon.push(lw); canyon.push(rw);
+          canyonL.push(lw); canyonR.push(rw);
+          ord++;
         }
       }
     }
@@ -365,36 +370,34 @@ export default function Game() {
         });
       });
 
-      // Canyon walls — layered red/orange rock
-      canyon.forEach(c => {
-        const dist = Math.sqrt((c.x - vw.x) ** 2 + (c.z - vw.z) ** 2);
-        if (dist > 500) return;
-        const al = Math.max(0.25, 1 - dist / 500);
-        const h3 = c.ht / 3;
-        const layers = [
-          [c.bY, c.bY + h3, 90, 50, 30],
-          [c.bY + h3, c.bY + h3 * 2, 160, 70, 35],
-          [c.bY + h3 * 2, c.bY + c.ht, 200, 130, 70],
-        ];
-        layers.forEach(([yB, yT, lr, lg, lb]) => {
-          const wB = c.w * 0.5, wT = c.w * 0.35;
-          const tB = (yB - c.bY) / c.ht, tT = (yT - c.bY) / c.ht;
-          const wAtB = wB * (1 - tB * 0.3), wAtT = wB * (1 - tT * 0.3);
-          const pBL = proj(c.x - wAtB, yB, c.z, cam, vh);
-          const pBR = proj(c.x + wAtB, yB, c.z, cam, vh);
-          const pTL = proj(c.x - wAtT, yT, c.z, cam, vh);
-          const pTR = proj(c.x + wAtT, yT, c.z, cam, vh);
-          if (!pBL || !pBR || !pTL || !pTR) return;
-          rn.push({ d: (pBL.d + pBR.d) / 2, f() {
-            x.globalAlpha = al;
-            x.fillStyle = `rgb(${lr},${lg},${lb})`;
-            x.beginPath(); x.moveTo(pBL.sx, pBL.sy); x.lineTo(pTL.sx, pTL.sy); x.lineTo(pTR.sx, pTR.sy); x.lineTo(pBR.sx, pBR.sy); x.closePath(); x.fill();
-            x.strokeStyle = `rgba(${lr * 0.5 | 0},${lg * 0.5 | 0},${lb * 0.5 | 0},${al * 0.4})`;
-            x.lineWidth = 1;
-            x.beginPath(); x.moveTo(pBL.sx, pBL.sy); x.lineTo(pTL.sx, pTL.sy); x.stroke();
-            x.globalAlpha = 1;
-          }});
-        });
+      // Canyon walls — smooth connected quads
+      [canyonL, canyonR].forEach(side => {
+        for (let i = 0; i < side.length - 1; i++) {
+          const a = side[i], b = side[i + 1];
+          const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+          const dist = Math.sqrt((mx - vw.x) ** 2 + (mz - vw.z) ** 2);
+          if (dist > 500) continue;
+          const al = Math.max(0.25, 1 - dist / 500);
+          const minB = Math.min(a.bY, b.bY), maxT = Math.max(a.bY + a.ht, b.bY + b.ht);
+          const totalH = maxT - minB;
+          const thirds = [[minB, minB + totalH / 3, 100, 55, 35], [minB + totalH / 3, minB + totalH * 2 / 3, 170, 80, 40], [minB + totalH * 2 / 3, maxT, 210, 140, 75]];
+          thirds.forEach(([yB, yT, lr, lg, lb]) => {
+            const cyB = Math.max(yB, Math.max(a.bY, b.bY));
+            const cyT = Math.min(yT, Math.min(a.bY + a.ht, b.bY + b.ht));
+            if (cyB >= cyT) return;
+            const pAB = proj(a.x, cyB, a.z, cam, vh);
+            const pAT = proj(a.x, cyT, a.z, cam, vh);
+            const pBB = proj(b.x, cyB, b.z, cam, vh);
+            const pBT = proj(b.x, cyT, b.z, cam, vh);
+            if (!pAB || !pAT || !pBB || !pBT) return;
+            rn.push({ d: (pAB.d + pBB.d) / 2, f() {
+              x.globalAlpha = al;
+              x.fillStyle = `rgb(${lr},${lg},${lb})`;
+              x.beginPath(); x.moveTo(pAB.sx, pAB.sy); x.lineTo(pAT.sx, pAT.sy); x.lineTo(pBT.sx, pBT.sy); x.lineTo(pBB.sx, pBB.sy); x.closePath(); x.fill();
+              x.globalAlpha = 1;
+            }});
+          });
+        }
       });
 
       // Course gates
