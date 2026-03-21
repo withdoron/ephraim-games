@@ -399,16 +399,16 @@ export default function Game() {
               x.globalAlpha = 1;
             }});
           });
-          // Top rim face
-          const aTop = Math.max(a.bY + a.ht, b.bY + b.ht);
-          const aIT = proj(a.x, aTop, a.z, cam, vh);
-          const bIT = proj(b.x, aTop, b.z, cam, vh);
-          const aOT = proj(a.x + a.px * rimD, aTop, a.z + a.pz * rimD, cam, vh);
-          const bOT = proj(b.x + b.px * rimD, aTop, b.z + b.pz * rimD, cam, vh);
+          // Top rim face — flat horizontal quad at wall top
+          const aTopY = a.bY + a.ht, bTopY = b.bY + b.ht;
+          const aIT = proj(a.x, aTopY, a.z, cam, vh);
+          const bIT = proj(b.x, bTopY, b.z, cam, vh);
+          const aOT = proj(a.x + a.px * rimD, aTopY, a.z + a.pz * rimD, cam, vh);
+          const bOT = proj(b.x + b.px * rimD, bTopY, b.z + b.pz * rimD, cam, vh);
           if (aIT && bIT && aOT && bOT) {
             rn.push({ d: (aIT.d + bIT.d) / 2 - 1, f() {
               x.globalAlpha = al;
-              x.fillStyle = "rgb(220,160,90)";
+              x.fillStyle = "rgb(210,150,80)";
               x.beginPath(); x.moveTo(aIT.sx, aIT.sy); x.lineTo(bIT.sx, bIT.sy); x.lineTo(bOT.sx, bOT.sy); x.lineTo(aOT.sx, aOT.sy); x.closePath(); x.fill();
               x.globalAlpha = 1;
             }});
