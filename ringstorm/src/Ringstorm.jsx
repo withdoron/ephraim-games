@@ -102,11 +102,11 @@ export default function Game() {
 
     // Racers
     const defs = [
-      { id: "p1", nm: "BLUE", ac: "#3b82f6", cp: "#60a5fa", npc: 0 },
-      { id: "p2", nm: "RED", ac: "#ef4444", cp: "#f87171", npc: 0 },
-      { id: "n1", nm: "VIPER", ac: "#22c55e", cp: "#4ade80", npc: 1 },
-      { id: "n2", nm: "BLAZE", ac: "#f97316", cp: "#fb923c", npc: 1 },
-      { id: "n3", nm: "STORM", ac: "#a855f7", cp: "#c084fc", npc: 1 },
+      { id: "p1", nm: "BLUE", ac: "#3b82f6", cp: "#60a5fa", sc: "#ffffff", npc: 0 },
+      { id: "p2", nm: "RED", ac: "#ef4444", cp: "#f87171", sc: "#ffffff", npc: 0 },
+      { id: "n1", nm: "VIPER", ac: "#22c55e", cp: "#4ade80", sc: "#1a1a1a", npc: 1 },
+      { id: "n2", nm: "BLAZE", ac: "#f59e0b", cp: "#fbbf24", sc: "#1a1a1a", npc: 1 },
+      { id: "n3", nm: "STORM", ac: "#a855f7", cp: "#c084fc", sc: "#1a1a1a", npc: 1 },
     ];
     const ads = iB ? (i2 ? defs.slice(0, 2) : [defs[0], defs[2]]) : (i2 ? defs : [defs[0], ...defs.slice(2)]);
     const sp = iB ? { x: 0, y: 200, z: 0 } : (crs[0] || { x: 0, y: 200, z: 0 });
@@ -319,10 +319,27 @@ export default function Game() {
     function renderView(cam, vw, yO, vh) {
       x.save();
       x.beginPath(); x.rect(0, yO, W, vh); x.clip(); x.translate(0, yO);
-      // Sky
+      // Sky — 8-stop gradient
       const sg = x.createLinearGradient(0, 0, 0, vh);
-      sg.addColorStop(0, "#0a1628"); sg.addColorStop(0.35, "#1a3a5c"); sg.addColorStop(0.75, "#4a8ab5"); sg.addColorStop(1, "#87CEEB");
+      sg.addColorStop(0, "#050d1a"); sg.addColorStop(0.12, "#0a1628"); sg.addColorStop(0.25, "#132d4a");
+      sg.addColorStop(0.4, "#1a4a6e"); sg.addColorStop(0.55, "#3a7a9e"); sg.addColorStop(0.7, "#5a9ebe");
+      sg.addColorStop(0.85, "#87CEEB"); sg.addColorStop(1, "#d4a060");
       x.fillStyle = sg; x.fillRect(0, 0, W, vh);
+
+      // Clouds
+      const clouds = [
+        { cx: -200, cy: vh * 0.18, w: 90 }, { cx: 100, cy: vh * 0.14, w: 70 }, { cx: 350, cy: vh * 0.22, w: 110 },
+        { cx: 600, cy: vh * 0.16, w: 80 }, { cx: -50, cy: vh * 0.28, w: 60 }, { cx: 450, cy: vh * 0.1, w: 95 },
+        { cx: 750, cy: vh * 0.2, w: 75 },
+      ];
+      clouds.forEach(cl => {
+        x.fillStyle = "rgba(255,255,255,0.08)";
+        x.beginPath(); x.ellipse(cl.cx, cl.cy, cl.w, cl.w * 0.3, 0, 0, Math.PI * 2); x.fill();
+        x.fillStyle = "rgba(255,255,255,0.06)";
+        x.beginPath(); x.ellipse(cl.cx - cl.w * 0.4, cl.cy + 3, cl.w * 0.7, cl.w * 0.25, 0, 0, Math.PI * 2); x.fill();
+        x.fillStyle = "rgba(255,255,255,0.05)";
+        x.beginPath(); x.ellipse(cl.cx + cl.w * 0.35, cl.cy + 2, cl.w * 0.6, cl.w * 0.22, 0, 0, Math.PI * 2); x.fill();
+      });
 
       const rn = [];
       const stp = TS / GR, vD = 550;
@@ -341,7 +358,12 @@ export default function Game() {
           if (!p00 && !p10 && !p01 && !p11) continue;
           const h = tH[i][j];
           let r, g, b;
-          if (h < -20) { r = 30; g = 60; b = 100; } else if (h < 30) { r = 45; g = 85; b = 40; } else { r = 140; g = 130; b = 100; }
+          // 6-band smooth terrain: deep water, shallow water, beach, grass, rock, snow
+          const bands = [[-60,20,40,90],[-20,35,55,100],[0,65,60,45],[20,50,95,40],[50,130,115,85],[90,220,220,230]];
+          let bi = 0;
+          while (bi < bands.length - 1 && h > bands[bi + 1][0]) bi++;
+          if (bi >= bands.length - 1) { r = bands[bands.length-1][1]; g = bands[bands.length-1][2]; b = bands[bands.length-1][3]; }
+          else { const lo = bands[bi], hi = bands[bi+1]; const t = Math.max(0, Math.min(1, (h - lo[0]) / (hi[0] - lo[0]))); r = lo[1] + (hi[1] - lo[1]) * t; g = lo[2] + (hi[2] - lo[2]) * t; b = lo[3] + (hi[3] - lo[3]) * t; }
           const sh = Math.max(0.3, 1 - dist / vD);
           rn.push({ d: ((p00?.d || 9999) + (p10?.d || 9999)) / 2, f() {
             x.fillStyle = `rgba(${r * sh | 0},${g * sh | 0},${b * sh | 0},${sh})`;
@@ -392,8 +414,9 @@ export default function Game() {
           const al = Math.max(0.25, 1 - dist / 600);
           const minB = Math.min(a.bY, b.bY), maxT = Math.max(a.bY + a.ht, b.bY + b.ht);
           const totalH = maxT - minB;
-          // Front face — layered rock
-          const thirds = [[minB, minB + totalH / 3, 100, 55, 35], [minB + totalH / 3, minB + totalH * 2 / 3, 170, 80, 40], [minB + totalH * 2 / 3, maxT, 210, 140, 75]];
+          // Front face — layered rock with per-segment color variation
+          const cv = ((a.ord * 7 + 13) % 21 - 10);
+          const thirds = [[minB, minB + totalH / 3, 80+cv, 40+cv/2, 25+cv/3], [minB + totalH / 3, minB + totalH * 2 / 3, 175+cv, 75+cv/2, 35+cv/3], [minB + totalH * 2 / 3, maxT, 215+cv, 145+cv/2, 80+cv/3]];
           thirds.forEach(([yB, yT, lr, lg, lb]) => {
             const cyB = Math.max(yB, Math.max(a.bY, b.bY));
             const cyT = Math.min(yT, Math.min(a.bY + a.ht, b.bY + b.ht));
@@ -435,9 +458,14 @@ export default function Game() {
         if (s < 2) return;
         const isN = idx === vw.ng;
         rn.push({ d: p.d, f() {
-          x.strokeStyle = isN ? "rgba(50,255,50,1)" : "rgba(255,200,50,0.1)";
-          x.lineWidth = isN ? Math.max(3, s * 0.14) : Math.max(1, s * 0.05);
-          if (isN) { x.shadowColor = "rgba(50,255,50,0.5)"; x.shadowBlur = 8; }
+          // Outer thick glow stroke
+          x.strokeStyle = isN ? "rgba(50,255,50,0.3)" : "rgba(255,200,50,0.06)";
+          x.lineWidth = isN ? Math.max(6, s * 0.25) : Math.max(2, s * 0.1);
+          x.beginPath(); x.ellipse(p.sx, p.sy, s, s * 0.35, 0, 0, Math.PI * 2); x.stroke();
+          // Inner bright stroke
+          x.strokeStyle = isN ? "rgba(50,255,50,1)" : "rgba(255,200,50,0.15)";
+          x.lineWidth = isN ? Math.max(2, s * 0.08) : Math.max(1, s * 0.04);
+          if (isN) { x.shadowColor = "rgba(50,255,50,0.6)"; x.shadowBlur = 12; }
           x.beginPath(); x.ellipse(p.sx, p.sy, s, s * 0.35, 0, 0, Math.PI * 2); x.stroke();
           x.shadowBlur = 0;
         }});
@@ -475,7 +503,7 @@ export default function Game() {
         }});
       });
 
-      // Other racers
+      // Other racers — simplified sci-fi biplane
       rs.forEach(r => {
         if (r === vw || r.cr || r.fn) return;
         const p = proj(r.x, r.y, r.z, cam, vh);
@@ -483,14 +511,17 @@ export default function Game() {
         const s = Math.max(3, 11 * p.sc);
         rn.push({ d: p.d, f() {
           x.save(); x.translate(p.sx, p.sy); x.rotate(-r.rl);
-          const sc = s / 11;
-          x.fillStyle = "#bbb";
-          x.beginPath(); x.moveTo(-15 * sc, 2 * sc); x.lineTo(15 * sc, 2 * sc); x.lineTo(4 * sc, 3 * sc); x.lineTo(-4 * sc, 3 * sc); x.closePath(); x.fill();
-          x.fillStyle = r.ac;
-          x.fillRect(-16 * sc, 0, 3 * sc, 3 * sc); x.fillRect(13 * sc, 0, 3 * sc, 3 * sc);
-          x.fillStyle = "#ddd";
-          x.beginPath(); x.moveTo(0, -8 * sc); x.lineTo(2.5 * sc, 5 * sc); x.lineTo(-2.5 * sc, 5 * sc); x.closePath(); x.fill();
-          if (r.st > 0) { x.fillStyle = "rgba(255,200,50,0.2)"; x.beginPath(); x.arc(0, 0, 16 * sc, 0, Math.PI * 2); x.fill(); }
+          const u = s / 11;
+          // Star glow behind
+          if (r.st > 0) { x.fillStyle = "rgba(255,200,50,0.2)"; x.beginPath(); x.arc(0, 0, 16 * u, 0, Math.PI * 2); x.fill(); }
+          // Lower wing
+          x.fillStyle = r.sc; x.beginPath(); x.moveTo(-18*u, 3*u); x.lineTo(-5*u, 1.5*u); x.lineTo(5*u, 1.5*u); x.lineTo(18*u, 3*u); x.lineTo(5*u, 4*u); x.lineTo(-5*u, 4*u); x.closePath(); x.fill();
+          // Upper wing
+          x.fillStyle = r.sc; x.beginPath(); x.moveTo(-15*u, -2*u); x.lineTo(-4*u, -3*u); x.lineTo(4*u, -3*u); x.lineTo(15*u, -2*u); x.lineTo(4*u, -1*u); x.lineTo(-4*u, -1*u); x.closePath(); x.fill();
+          // Fuselage
+          x.fillStyle = r.ac; x.beginPath(); x.moveTo(0, -10*u); x.lineTo(2.5*u, -3*u); x.lineTo(2.5*u, 6*u); x.lineTo(1.2*u, 8*u); x.lineTo(-1.2*u, 8*u); x.lineTo(-2.5*u, 6*u); x.lineTo(-2.5*u, -3*u); x.closePath(); x.fill();
+          // Wing tips
+          x.fillStyle = r.ac; x.beginPath(); x.arc(-18*u, 3*u, 1.2*u, 0, Math.PI * 2); x.fill(); x.beginPath(); x.arc(18*u, 3*u, 1.2*u, 0, Math.PI * 2); x.fill();
           x.restore();
         }});
       });
@@ -522,17 +553,41 @@ export default function Game() {
       rn.sort((a, b) => b.d - a.d);
       rn.forEach(r => r.f());
 
-      // Own plane
+      // Distance fog overlay
+      const fogG = x.createLinearGradient(0, vh * 0.3, 0, vh);
+      fogG.addColorStop(0, "rgba(140,180,210,0)"); fogG.addColorStop(0.5, "rgba(140,180,210,0.08)"); fogG.addColorStop(1, "rgba(140,180,210,0.2)");
+      x.fillStyle = fogG; x.fillRect(0, 0, W, vh);
+
+      // Own plane — sci-fi biplane
       if (!vw.cr && !vw.fn) {
         const sx = W / 2, sy = vh / 2 + (i2 ? 14 : 28);
         x.save(); x.translate(sx, sy - vw.p * (i2 ? 10 : 18)); x.rotate(-vw.rl);
         const s = i2 ? 0.85 : 1.3;
+        // Star power glow (behind plane)
         if (vw.st > 0) { x.fillStyle = `rgba(255,200,50,${0.1 + Math.sin(fc * 0.3) * 0.05})`; x.beginPath(); x.arc(0, 0, 22 * s, 0, Math.PI * 2); x.fill(); }
-        x.fillStyle = "#bbb"; x.beginPath(); x.moveTo(-15 * s, 2 * s); x.lineTo(15 * s, 2 * s); x.lineTo(4 * s, 3 * s); x.lineTo(-4 * s, 3 * s); x.closePath(); x.fill();
-        x.fillStyle = vw.ac; x.fillRect(-16 * s, 0, 2.5 * s, 2.5 * s); x.fillRect(13.5 * s, 0, 2.5 * s, 2.5 * s);
-        x.fillStyle = "#e0e0e0"; x.beginPath(); x.moveTo(0, -9 * s); x.lineTo(2.8 * s, -2 * s); x.lineTo(2.8 * s, 6 * s); x.lineTo(1.5 * s, 8 * s); x.lineTo(-1.5 * s, 8 * s); x.lineTo(-2.8 * s, 6 * s); x.lineTo(-2.8 * s, -2 * s); x.closePath(); x.fill();
-        x.fillStyle = vw.cp; x.beginPath(); x.ellipse(0, -4.5 * s, 1.5 * s, 2.3 * s, 0, 0, Math.PI * 2); x.fill();
-        if (vw.th > 0.3 || vw.bt > 0) { const ga = vw.bt > 0 ? 1 : (vw.th - 0.3) / 0.7; x.fillStyle = `rgba(${vw.bt > 0 ? "50,255,100" : "255," + (150 + ga * 105 | 0) + ",50"},${ga * 0.5})`; x.beginPath(); x.ellipse(0, 9 * s, 1.3 * s, (1 + ga * 2) * s, 0, 0, Math.PI * 2); x.fill(); }
+        // Engine glow
+        if (vw.th > 0.3 || vw.bt > 0) { const ga = vw.bt > 0 ? 1 : (vw.th - 0.3) / 0.7; x.fillStyle = `rgba(${vw.bt > 0 ? "50,255,100" : "255," + (150 + ga * 105 | 0) + ",50"},${ga * 0.5})`; x.beginPath(); x.ellipse(-4 * s, 10 * s, 1.2 * s, (1 + ga * 2) * s, 0, 0, Math.PI * 2); x.fill(); x.beginPath(); x.ellipse(4 * s, 10 * s, 1.2 * s, (1 + ga * 2) * s, 0, 0, Math.PI * 2); x.fill(); }
+        // Lower wing
+        x.fillStyle = vw.sc; x.beginPath(); x.moveTo(-20*s, 4*s); x.lineTo(-6*s, 2*s); x.lineTo(6*s, 2*s); x.lineTo(20*s, 4*s); x.lineTo(6*s, 5*s); x.lineTo(-6*s, 5*s); x.closePath(); x.fill();
+        x.strokeStyle = vw.ac; x.lineWidth = 1; x.beginPath(); x.moveTo(-20*s, 4*s); x.lineTo(-6*s, 2*s); x.lineTo(6*s, 2*s); x.lineTo(20*s, 4*s); x.stroke();
+        // Upper wing
+        x.fillStyle = vw.sc; x.beginPath(); x.moveTo(-17*s, -2*s); x.lineTo(-5*s, -3.5*s); x.lineTo(5*s, -3.5*s); x.lineTo(17*s, -2*s); x.lineTo(5*s, -1*s); x.lineTo(-5*s, -1*s); x.closePath(); x.fill();
+        x.strokeStyle = vw.ac; x.beginPath(); x.moveTo(-17*s, -2*s); x.lineTo(-5*s, -3.5*s); x.lineTo(5*s, -3.5*s); x.lineTo(17*s, -2*s); x.stroke();
+        // Wing struts
+        x.strokeStyle = vw.ac; x.lineWidth = 1; x.beginPath(); x.moveTo(-8*s, -2*s); x.lineTo(-8*s, 4*s); x.stroke(); x.beginPath(); x.moveTo(8*s, -2*s); x.lineTo(8*s, 4*s); x.stroke();
+        // Fuselage
+        x.fillStyle = vw.ac; x.beginPath(); x.moveTo(0, -12*s); x.lineTo(3*s, -4*s); x.lineTo(3*s, 7*s); x.lineTo(1.5*s, 9*s); x.lineTo(-1.5*s, 9*s); x.lineTo(-3*s, 7*s); x.lineTo(-3*s, -4*s); x.closePath(); x.fill();
+        // Fuselage highlight
+        x.strokeStyle = "rgba(255,255,255,0.25)"; x.lineWidth = 1; x.beginPath(); x.moveTo(0, -11*s); x.lineTo(0, 8*s); x.stroke();
+        // Tail fins
+        x.fillStyle = vw.ac; x.beginPath(); x.moveTo(-3*s, 7*s); x.lineTo(-6*s, 5*s); x.lineTo(-2*s, 9*s); x.closePath(); x.fill();
+        x.beginPath(); x.moveTo(3*s, 7*s); x.lineTo(6*s, 5*s); x.lineTo(2*s, 9*s); x.closePath(); x.fill();
+        // Engine pods
+        x.fillStyle = "rgba(0,0,0,0.3)"; x.fillRect(-11.25*s, 5*s, 2.5*s, 3*s); x.fillRect(8.75*s, 5*s, 2.5*s, 3*s);
+        // Cockpit
+        x.fillStyle = vw.cp; x.beginPath(); x.ellipse(0, -6*s, 1.5*s, 2.5*s, 0, 0, Math.PI * 2); x.fill();
+        // Wing tips
+        x.fillStyle = vw.ac; x.beginPath(); x.arc(-20*s, 4*s, 1.5*s, 0, Math.PI * 2); x.fill(); x.beginPath(); x.arc(20*s, 4*s, 1.5*s, 0, Math.PI * 2); x.fill();
         x.restore();
       } else if (vw.cr) {
         x.fillStyle = "#ef4444"; x.font = "bold " + (i2 ? 16 : 26) + "px Georgia"; x.textAlign = "center";
