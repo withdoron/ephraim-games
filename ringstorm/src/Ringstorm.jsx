@@ -51,33 +51,37 @@ export default function Game() {
       return tH[ix][iz] * (1 - fx) * (1 - fz) + (tH[ix + 1]?.[iz] ?? tH[ix][iz]) * fx * (1 - fz) + (tH[ix]?.[iz + 1] ?? tH[ix][iz]) * (1 - fx) * fz + (tH[ix + 1]?.[iz + 1] ?? tH[ix][iz]) * fx * fz;
     }
 
-    // Mountains (simple triangles)
+    // Mountains (battle mode only)
     const mts = [];
-    for (let i = 0; i < 6; i++) {
-      const a = Math.random() * Math.PI * 2, d = 500 + Math.random() * 700;
-      const mx = Math.cos(a) * d, mz = Math.sin(a) * d;
-      mts.push({ x: mx, z: mz, bY: gH(mx, mz), ht: 150 + Math.random() * 170, w: 50 + Math.random() * 55 });
+    if (iB) {
+      for (let i = 0; i < 6; i++) {
+        const a = Math.random() * Math.PI * 2, d = 500 + Math.random() * 700;
+        const mx = Math.cos(a) * d, mz = Math.sin(a) * d;
+        mts.push({ x: mx, z: mz, bY: gH(mx, mz), ht: 150 + Math.random() * 170, w: 50 + Math.random() * 55 });
+      }
     }
 
-    // Canyon walls along course segments
+    // Grand Canyon — continuous walls along course (race mode)
     const canyon = [];
     if (!iB && crs.length > 1) {
-      const segs = [[2, 5], [7, 9], [10, 11]];
-      segs.forEach(([s, e]) => {
-        for (let i = s; i <= e && i < NG; i++) {
-          const g1 = crs[i], g2 = crs[(i + 1) % NG];
+      for (let gi = 2; gi <= 9 && gi < NG; gi++) {
+        const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
+        const steps = 8;
+        for (let s = 0; s < steps; s++) {
+          const t = s / steps;
+          const cx = g1.x + (g2.x - g1.x) * t, cz = g1.z + (g2.z - g1.z) * t, cy = g1.y + (g2.y - g1.y) * t;
           const dx = g2.x - g1.x, dz = g2.z - g1.z;
           const len = Math.sqrt(dx * dx + dz * dz) || 1;
           const px = -dz / len, pz = dx / len;
-          const off = 65 + Math.random() * 15;
-          const ht = 120 + Math.random() * 80;
-          const w = 20 + Math.random() * 10;
-          const lx = g1.x + px * off, lz = g1.z + pz * off;
-          const rx = g1.x - px * off, rz = g1.z - pz * off;
+          const off = 55 + (Math.random() - 0.5) * 20;
+          const ht = 180 + Math.random() * 100;
+          const w = 25 + Math.random() * 10;
+          const lx = cx + px * off, lz = cz + pz * off;
+          const rx = cx - px * off, rz = cz - pz * off;
           canyon.push({ x: lx, z: lz, bY: gH(lx, lz), ht, w });
           canyon.push({ x: rx, z: rz, bY: gH(rx, rz), ht, w });
         }
-      });
+      }
     }
 
     // Racers
@@ -361,25 +365,36 @@ export default function Game() {
         });
       });
 
-      // Canyon walls
+      // Canyon walls — layered red/orange rock
       canyon.forEach(c => {
         const dist = Math.sqrt((c.x - vw.x) ** 2 + (c.z - vw.z) ** 2);
         if (dist > 500) return;
-        const al = Math.max(0.2, 1 - dist / 500);
-        const pT = proj(c.x, c.bY + c.ht, c.z, cam, vh);
-        const pB1 = proj(c.x - c.w * 0.5, c.bY, c.z, cam, vh);
-        const pB2 = proj(c.x + c.w * 0.5, c.bY, c.z, cam, vh);
-        if (!pT || !pB1 || !pB2) return;
-        rn.push({ d: (pT.d + pB1.d) / 2, f() {
-          x.globalAlpha = al;
-          x.fillStyle = `rgb(${90 * 0.7 | 0},${75 * 0.7 | 0},${60 * 0.7 | 0})`;
-          x.beginPath(); x.moveTo(pB1.sx, pB1.sy); x.lineTo(pT.sx, pT.sy); x.lineTo(pB2.sx, pB2.sy); x.closePath(); x.fill();
-          x.fillStyle = `rgb(${90 * 0.5 | 0},${75 * 0.5 | 0},${60 * 0.5 | 0})`;
-          const pT2 = proj(c.x, c.bY + c.ht, c.z + c.w * 0.5, cam, vh);
-          const pB3 = proj(c.x + c.w * 0.5, c.bY, c.z + c.w * 0.5, cam, vh);
-          if (pT2 && pB3) { x.beginPath(); x.moveTo(pB2.sx, pB2.sy); x.lineTo(pT.sx, pT.sy); x.lineTo(pT2.sx, pT2.sy); x.lineTo(pB3.sx, pB3.sy); x.closePath(); x.fill(); }
-          x.globalAlpha = 1;
-        }});
+        const al = Math.max(0.25, 1 - dist / 500);
+        const h3 = c.ht / 3;
+        const layers = [
+          [c.bY, c.bY + h3, 90, 50, 30],
+          [c.bY + h3, c.bY + h3 * 2, 160, 70, 35],
+          [c.bY + h3 * 2, c.bY + c.ht, 200, 130, 70],
+        ];
+        layers.forEach(([yB, yT, lr, lg, lb]) => {
+          const wB = c.w * 0.5, wT = c.w * 0.35;
+          const tB = (yB - c.bY) / c.ht, tT = (yT - c.bY) / c.ht;
+          const wAtB = wB * (1 - tB * 0.3), wAtT = wB * (1 - tT * 0.3);
+          const pBL = proj(c.x - wAtB, yB, c.z, cam, vh);
+          const pBR = proj(c.x + wAtB, yB, c.z, cam, vh);
+          const pTL = proj(c.x - wAtT, yT, c.z, cam, vh);
+          const pTR = proj(c.x + wAtT, yT, c.z, cam, vh);
+          if (!pBL || !pBR || !pTL || !pTR) return;
+          rn.push({ d: (pBL.d + pBR.d) / 2, f() {
+            x.globalAlpha = al;
+            x.fillStyle = `rgb(${lr},${lg},${lb})`;
+            x.beginPath(); x.moveTo(pBL.sx, pBL.sy); x.lineTo(pTL.sx, pTL.sy); x.lineTo(pTR.sx, pTR.sy); x.lineTo(pBR.sx, pBR.sy); x.closePath(); x.fill();
+            x.strokeStyle = `rgba(${lr * 0.5 | 0},${lg * 0.5 | 0},${lb * 0.5 | 0},${al * 0.4})`;
+            x.lineWidth = 1;
+            x.beginPath(); x.moveTo(pBL.sx, pBL.sy); x.lineTo(pTL.sx, pTL.sy); x.stroke();
+            x.globalAlpha = 1;
+          }});
+        });
       });
 
       // Course gates
