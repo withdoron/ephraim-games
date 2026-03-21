@@ -326,21 +326,6 @@ export default function Game() {
       sg.addColorStop(0.85, "#87CEEB"); sg.addColorStop(1, "#d4a060");
       x.fillStyle = sg; x.fillRect(0, 0, W, vh);
 
-      // Clouds
-      const clouds = [
-        { cx: -200, cy: vh * 0.18, w: 90 }, { cx: 100, cy: vh * 0.14, w: 70 }, { cx: 350, cy: vh * 0.22, w: 110 },
-        { cx: 600, cy: vh * 0.16, w: 80 }, { cx: -50, cy: vh * 0.28, w: 60 }, { cx: 450, cy: vh * 0.1, w: 95 },
-        { cx: 750, cy: vh * 0.2, w: 75 },
-      ];
-      clouds.forEach(cl => {
-        x.fillStyle = "rgba(255,255,255,0.08)";
-        x.beginPath(); x.ellipse(cl.cx, cl.cy, cl.w, cl.w * 0.3, 0, 0, Math.PI * 2); x.fill();
-        x.fillStyle = "rgba(255,255,255,0.06)";
-        x.beginPath(); x.ellipse(cl.cx - cl.w * 0.4, cl.cy + 3, cl.w * 0.7, cl.w * 0.25, 0, 0, Math.PI * 2); x.fill();
-        x.fillStyle = "rgba(255,255,255,0.05)";
-        x.beginPath(); x.ellipse(cl.cx + cl.w * 0.35, cl.cy + 2, cl.w * 0.6, cl.w * 0.22, 0, 0, Math.PI * 2); x.fill();
-      });
-
       const rn = [];
       const stp = TS / GR, vD = 550;
 
