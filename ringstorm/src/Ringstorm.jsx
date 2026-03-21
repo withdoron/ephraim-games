@@ -30,10 +30,11 @@ export default function Game() {
     const crs = [];
     const baseY = cr === 3 ? 80 : cr === 1 ? 220 : 180;
     const yVar = cr === 3 ? 15 : 30;
+    const courseR = cr === 4 ? 1300 : 1200;
     if (!iB) {
       for (let i = 0; i < NG; i++) {
         const a = (i / NG) * Math.PI * 2;
-        crs.push({ x: Math.cos(a) * 1200 + Math.cos(a * 2) * 60, y: baseY + Math.sin(a * 2 + 1) * yVar, z: Math.sin(a) * 1200 + Math.sin(a * 3) * 50, sz: 55 });
+        crs.push({ x: Math.cos(a) * courseR + Math.cos(a * 2) * 60, y: baseY + Math.sin(a * 2 + 1) * yVar, z: Math.sin(a) * courseR + Math.sin(a * 3) * 50, sz: 55 });
       }
     }
 
@@ -50,6 +51,16 @@ export default function Game() {
     if (cr === 3) {
       // Ocean course — flat water
       for (let i = 0; i <= GR; i++) { tH[i] = []; for (let j = 0; j <= GR; j++) { tH[i][j] = -30 + Math.sin(i * 0.5) * 5 + Math.cos(j * 0.4) * 5; } }
+    } else if (cr === 4) {
+      // Volcano course — volcanic terrain with central peak
+      for (let i = 0; i <= GR; i++) { tH[i] = []; for (let j = 0; j <= GR; j++) {
+        const a = i / GR * 6, b = j / GR * 6;
+        let h = Math.sin(a * 1.2) * Math.cos(b * 0.8) * 50 + Math.sin(a * 2.5 + 1) * Math.cos(b * 1.8 + 2) * 25;
+        const wx = -TS / 2 + (i / GR) * TS, wz = -TS / 2 + (j / GR) * TS;
+        const distC = Math.sqrt(wx * wx + wz * wz);
+        h += 280 * Math.max(0, 1 - distC / 500);
+        tH[i][j] = h;
+      } }
     } else {
       for (let i = 0; i <= GR; i++) { tH[i] = []; for (let j = 0; j <= GR; j++) { const a = i / GR * 6, b = j / GR * 6; tH[i][j] = Math.sin(a * 1.2) * Math.cos(b * 0.8) * 80 + Math.sin(a * 2.5 + 1) * Math.cos(b * 1.8 + 2) * 40; } }
     }
@@ -134,6 +145,41 @@ export default function Game() {
         const mx = g1.x + dx * t + px * off * side;
         const mz = g1.z + dz * t + pz * off * side;
         mts.push({ x: mx, z: mz, bY: gH(mx, mz), ht: 40 + Math.random() * 40, w: 15 + Math.random() * 20 });
+      }
+    }
+
+    // Pirate ships (Ocean Run scenery)
+    const ships = [];
+    if (!iB && cr === 3 && crs.length > 1) {
+      for (let i = 0; i < 8; i++) {
+        const gi = Math.floor(Math.random() * NG);
+        const g = crs[gi];
+        const a = Math.random() * Math.PI * 2;
+        const d = 40 + Math.random() * 110;
+        ships.push({ x: g.x + Math.cos(a) * d, z: g.z + Math.sin(a) * d, y: -25, phase: Math.random() * Math.PI * 2, rot: Math.random() * Math.PI * 2 });
+      }
+    }
+
+    // Volcano course: dark rock formations + lava particles
+    if (!iB && cr === 4 && crs.length > 1) {
+      for (let i = 0; i < 6; i++) {
+        const gi = Math.floor(Math.random() * NG);
+        const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
+        const t = Math.random();
+        const dx = g2.x - g1.x, dz = g2.z - g1.z;
+        const len = Math.sqrt(dx * dx + dz * dz) || 1;
+        const px = -dz / len, pz = dx / len;
+        const side = Math.random() < 0.5 ? 1 : -1;
+        const off = 80 + Math.random() * 120;
+        const mx = g1.x + dx * t + px * off * side;
+        const mz = g1.z + dz * t + pz * off * side;
+        mts.push({ x: mx, z: mz, bY: gH(mx, mz), ht: 100 + Math.random() * 120, w: 35 + Math.random() * 30, volcanic: 1 });
+      }
+    }
+    const lavaP = [];
+    if (!iB && cr === 4) {
+      for (let i = 0; i < 8; i++) {
+        lavaP.push({ x: (Math.random() - 0.5) * 60, y: 200 + Math.random() * 80, z: (Math.random() - 0.5) * 60, vy: 0.3 + Math.random() * 0.5, phase: Math.random() * Math.PI * 2 });
       }
     }
 
@@ -430,6 +476,12 @@ export default function Game() {
             r = 20 + wt * 10; g = 60 + wt * 20; b = 120 + wt * 20;
             // Foam highlights at wave peaks
             if (h > -27) { const foam = (h + 27) / 5; r += foam * 140; g += foam * 120; b += foam * 80; }
+          } else if (cr === 4) {
+            // Volcano course — lava and volcanic rock
+            if (h < 0) { const lv = Math.sin(i * 1.3 + j * 0.7) * 0.5 + 0.5; r = 200 + lv * 40; g = 60 + lv * 60; b = 20 + lv * 10; }
+            else if (h < 60) { r = 40; g = 35; b = 30; }
+            else if (h < 150) { const t = (h - 60) / 90; r = 40 + t * 30; g = 35 + t * 30; b = 30 + t * 30; }
+            else { r = 90; g = 40; b = 30; }
           } else {
             // 6-band smooth terrain: deep water, shallow water, beach, grass, rock, snow
             const bands = [[-60,20,40,90],[-20,35,55,100],[0,65,60,45],[20,50,95,40],[50,130,115,85],[90,220,220,230]];
@@ -466,12 +518,18 @@ export default function Game() {
           if (!a || !b) return;
           rn.push({ d: (a.d + pP.d) / 2, f() {
             x.globalAlpha = al;
-            x.fillStyle = `rgb(${70 * sh + 30 | 0},${60 * sh + 25 | 0},${50 * sh + 20 | 0})`;
+            if (m.volcanic) {
+              x.fillStyle = `rgb(${50 * sh + 15 | 0},${40 * sh + 12 | 0},${35 * sh + 10 | 0})`;
+            } else {
+              x.fillStyle = `rgb(${70 * sh + 30 | 0},${60 * sh + 25 | 0},${50 * sh + 20 | 0})`;
+            }
             x.beginPath(); x.moveTo(a.sx, a.sy); x.lineTo(pP.sx, pP.sy); x.lineTo(b.sx, b.sy); x.closePath(); x.fill();
-            // Snow
-            x.fillStyle = `rgb(${200 * sh + 40 | 0},${200 * sh + 40 | 0},${210 * sh + 30 | 0})`;
-            const sY = m.bY + m.ht * 0.7;
-            const sA = proj((a.sx === pL?.sx ? m.x - m.w / 2 : a.sx === pF?.sx ? m.x : a.sx === pR?.sx ? m.x + m.w / 2 : m.x), sY, (a.sx === pL?.sx ? m.z : a.sx === pF?.sx ? m.z - m.w / 2 : a.sx === pR?.sx ? m.z : m.z + m.w / 2), cam, vh);
+            if (!m.volcanic) {
+              // Snow (non-volcanic only)
+              x.fillStyle = `rgb(${200 * sh + 40 | 0},${200 * sh + 40 | 0},${210 * sh + 30 | 0})`;
+              const sY = m.bY + m.ht * 0.7;
+              const sA = proj((a.sx === pL?.sx ? m.x - m.w / 2 : a.sx === pF?.sx ? m.x : a.sx === pR?.sx ? m.x + m.w / 2 : m.x), sY, (a.sx === pL?.sx ? m.z : a.sx === pF?.sx ? m.z - m.w / 2 : a.sx === pR?.sx ? m.z : m.z + m.w / 2), cam, vh);
+            }
             x.globalAlpha = 1;
           }});
         });
@@ -528,6 +586,64 @@ export default function Game() {
           x.globalAlpha = 1;
         }});
       });
+
+      // Pirate ships (Ocean Run scenery)
+      ships.forEach(sh => {
+        const dist = Math.sqrt((sh.x - vw.x) ** 2 + (sh.z - vw.z) ** 2);
+        if (dist > 500) return;
+        const bobY = sh.y + Math.sin(fc * 0.015 + sh.phase) * 2;
+        const p = proj(sh.x, bobY, sh.z, cam, vh);
+        if (!p || p.d > 400) return;
+        const sc2 = p.sc;
+        rn.push({ d: p.d, f() {
+          x.save(); x.translate(p.sx, p.sy);
+          const u = sc2;
+          // Hull — boat shape
+          x.fillStyle = "rgb(70,40,20)";
+          x.beginPath(); x.moveTo(-10*u, 0); x.quadraticCurveTo(-8*u, 3*u, 0, 3.5*u); x.quadraticCurveTo(8*u, 3*u, 12*u, -1*u); x.lineTo(10*u, 0); x.closePath(); x.fill();
+          // Deck
+          x.fillStyle = "rgb(120,75,40)";
+          x.fillRect(-8*u, -1*u, 16*u, 2*u);
+          // Mast
+          x.strokeStyle = "rgb(90,60,30)"; x.lineWidth = Math.max(1, 1.2*u);
+          x.beginPath(); x.moveTo(0, -1*u); x.lineTo(0, -18*u); x.stroke();
+          // Sail — triangle
+          x.fillStyle = "rgb(230,220,200)";
+          x.beginPath(); x.moveTo(0, -17*u); x.lineTo(0, -5*u); x.lineTo(8*u, -8*u); x.closePath(); x.fill();
+          // Flag
+          x.fillStyle = "rgb(200,30,30)";
+          x.fillRect(0, -19*u, 4*u, 2.5*u);
+          x.restore();
+        }});
+      });
+
+      // Volcano peak glow + lava particles (Course 4)
+      if (cr === 4) {
+        const vp = proj(0, 280, 0, cam, vh);
+        if (vp && vp.d < 800) {
+          rn.push({ d: vp.d, f() {
+            x.globalAlpha = 0.3; x.fillStyle = "rgba(255,80,20,1)";
+            x.beginPath(); x.arc(vp.sx, vp.sy, 40 * vp.sc, 0, Math.PI * 2); x.fill();
+            x.globalAlpha = 0.4; x.fillStyle = "rgba(255,150,50,1)";
+            x.beginPath(); x.arc(vp.sx, vp.sy, 20 * vp.sc, 0, Math.PI * 2); x.fill();
+            x.globalAlpha = 1;
+          }});
+        }
+        // Lava particles — drift upward
+        lavaP.forEach(lp => {
+          lp.y += lp.vy;
+          if (lp.y > 350) { lp.y = 200 + Math.random() * 30; lp.x = (Math.random() - 0.5) * 60; lp.z = (Math.random() - 0.5) * 60; }
+          const pp = proj(lp.x, lp.y, lp.z, cam, vh);
+          if (!pp) return;
+          const flicker = 0.5 + Math.sin(fc * 0.1 + lp.phase) * 0.3;
+          rn.push({ d: pp.d, f() {
+            x.globalAlpha = flicker;
+            x.fillStyle = Math.random() > 0.5 ? "rgb(255,100,30)" : "rgb(255,180,50)";
+            x.beginPath(); x.arc(pp.sx, pp.sy, Math.max(2, 4 * pp.sc), 0, Math.PI * 2); x.fill();
+            x.globalAlpha = 1;
+          }});
+        });
+      }
 
       // Canyon walls — 3D with front face + rim
       const rimD = 40;
@@ -904,6 +1020,7 @@ export default function Game() {
       { name: "ISLAND SKIES", desc: "Weave between floating islands high above the clouds", color: "#22c55e", emoji: "\u{1F3DD}\u{FE0F}" },
       { name: "MOUNTAIN PASS", desc: "Thread the needle between snow-capped peaks", color: "#3b82f6", emoji: "\u{1F3D4}\u{FE0F}" },
       { name: "OCEAN RUN", desc: "Skim the waves over endless open ocean", color: "#06b6d4", emoji: "\u{1F30A}" },
+      { name: "VOLCANO", desc: "Fly over rivers of lava around an active volcano", color: "#dc2626", emoji: "\u{1F30B}" },
     ];
     return (
       <div style={{ width: "100%", minHeight: "100vh", background: bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: ft, color: "#e2e8f0", padding: "20px", textAlign: "center" }}>
