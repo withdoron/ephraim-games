@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 const D = Math.PI / 180;
 const PW = [{id:"gun",n:"Gun",e:"🔫",c:"#f59e0b"},{id:"boost",n:"Boost",e:"🚀",c:"#22c55e"},{id:"missile",n:"Missile",e:"💥",c:"#ef4444"},{id:"star",n:"Star",e:"⭐",c:"#fbbf24"},{id:"flares",n:"Flares",e:"🛡️",c:"#38bdf8"}];
-const LAPS = 3, NG = 12;
+const LAPS = 3, NG = 6;
 
 export default function Game() {
   const cv = useRef(null);
@@ -40,6 +40,20 @@ export default function Game() {
         const a = (i / NG) * Math.PI * 2;
         crs.push({ x: Math.cos(a) * courseR + Math.cos(a * 2) * 60, y: baseY + Math.sin(a * 2 + 1) * yVar, z: Math.sin(a) * courseR + Math.sin(a * 3) * 50, sz: 55 });
       }
+    }
+
+    // Course-specific gate height overrides
+    if (!iB && cr === 2 && crs.length >= NG) {
+      // Mountain Pass: roller coaster profile
+      crs[0].y = 180; crs[1].y = 180;
+      crs[2].y = 100; crs[3].y = 110;
+      crs[4].y = 300; crs[5].y = 180;
+    }
+    if (!iB && cr === 3 && crs.length >= NG) {
+      // Ocean Run: wave skimming section
+      crs[0].y = 80; crs[1].y = 80;
+      crs[2].y = 40; crs[3].y = 45;
+      crs[4].y = 80; crs[5].y = 80;
     }
 
     // Powerup rings
@@ -102,15 +116,19 @@ export default function Game() {
         const dx = g2.x - g1.x, dz = g2.z - g1.z;
         const len = Math.sqrt(dx * dx + dz * dz) || 1;
         const px = -dz / len, pz = dx / len;
-        const nmt = 2 + Math.floor(Math.random() * 2);
+        // Valley section (gates 2-3): tight mountains on both sides
+        const isValley = gi === 2 || gi === 3;
+        const isPeak = gi === 4;
+        const nmt = isValley ? 4 : isPeak ? 3 : 2;
         for (let j = 0; j < nmt; j++) {
-          const t = 0.2 + Math.random() * 0.6;
+          const t = 0.15 + Math.random() * 0.7;
           const cx = g1.x + dx * t, cz = g1.z + dz * t;
-          const side = Math.random() < 0.5 ? 1 : -1;
-          const off = 80 + Math.random() * 100;
-          const mx = cx + px * off * side + (Math.random() - 0.5) * 30;
-          const mz = cz + pz * off * side + (Math.random() - 0.5) * 30;
-          mts.push({ x: mx, z: mz, bY: gH(mx, mz), ht: 180 + Math.random() * 200, w: 40 + Math.random() * 40 });
+          const side = isValley ? (j < nmt / 2 ? 1 : -1) : (Math.random() < 0.5 ? 1 : -1);
+          const off = isValley ? 80 + Math.random() * 40 : isPeak ? 60 + Math.random() * 50 : 80 + Math.random() * 100;
+          const mx = cx + px * off * side + (Math.random() - 0.5) * 20;
+          const mz = cz + pz * off * side + (Math.random() - 0.5) * 20;
+          const ht = isValley ? 220 + Math.random() * 150 : isPeak ? 280 + Math.random() * 180 : 180 + Math.random() * 200;
+          mts.push({ x: mx, z: mz, bY: gH(mx, mz), ht, w: 40 + Math.random() * 40 });
         }
       }
     }
@@ -164,6 +182,25 @@ export default function Game() {
       }
     }
 
+    // Rock arches (Ocean Run scenery) — 3 arches near gates 1, 3, 5
+    const arches = [];
+    if (!iB && cr === 3 && crs.length > 1) {
+      [1, 3, 5].forEach(gi => {
+        if (gi >= NG) return;
+        const g = crs[gi];
+        const g2 = crs[(gi + 1) % NG];
+        const dx = g2.x - g.x, dz = g2.z - g.z;
+        const len = Math.sqrt(dx * dx + dz * dz) || 1;
+        const px = -dz / len, pz = dx / len;
+        const spread = 55 + Math.random() * 20;
+        arches.push({
+          lx: g.x + px * spread, lz: g.z + pz * spread,
+          rx: g.x - px * spread, rz: g.z - pz * spread,
+          y: -25, ht: 70 + Math.random() * 30, w: 12
+        });
+      });
+    }
+
     // Volcano course: dark rock formations + lava particles
     if (!iB && cr === 4 && crs.length > 1) {
       for (let i = 0; i < 6; i++) {
@@ -192,7 +229,7 @@ export default function Game() {
     const canyonL = [], canyonR = [];
     if (!iB && cr === 0 && crs.length > 1) {
       let ord = 0;
-      for (let gi = 2; gi <= 9 && gi < NG; gi++) {
+      for (let gi = 1; gi <= 4 && gi < NG; gi++) {
         const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
         const steps = 8;
         for (let s = 0; s < steps; s++) {
@@ -217,7 +254,7 @@ export default function Game() {
     // Extra powerup rings inside the canyon (Course 0 only)
     if (!iB && cr === 0 && crs.length > 1) {
       for (let i = 0; i < 10; i++) {
-        const gi = 2 + Math.floor(Math.random() * 8);
+        const gi = 1 + Math.floor(Math.random() * 4);
         const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
         const t = Math.random();
         const rx = g1.x + (g2.x - g1.x) * t + (Math.random() - 0.5) * 80;
@@ -226,13 +263,27 @@ export default function Game() {
       }
     }
 
-    // On-track powerup rings — placed between every other pair of gates (all courses)
+    // On-track powerup clusters — 6 rings between each pair of gates (2 clusters of 3)
     if (!iB && crs.length > 1) {
-      for (let i = 0; i < NG; i += 2) {
+      for (let i = 0; i < NG; i++) {
         const g1 = crs[i], g2 = crs[(i + 1) % NG];
-        const mx = (g1.x + g2.x) / 2, mz = (g1.z + g2.z) / 2;
-        const my = (g1.y + g2.y) / 2 + (Math.random() - 0.5) * 40;
-        br.push({ x: mx + (Math.random() - 0.5) * 30, y: my, z: mz + (Math.random() - 0.5) * 30, sz: 25, cl: 0, rt: 0 });
+        const dx = g2.x - g1.x, dz = g2.z - g1.z;
+        const len = Math.sqrt(dx * dx + dz * dz) || 1;
+        const px = -dz / len, pz = dx / len;
+        // Cluster at 1/3 point
+        for (let off of [-25, 0, 25]) {
+          const t = 1/3;
+          const mx = g1.x + dx * t + px * off, mz = g1.z + dz * t + pz * off;
+          const my = g1.y + (g2.y - g1.y) * t;
+          br.push({ x: mx, y: my, z: mz, sz: 25, cl: 0, rt: 0 });
+        }
+        // Cluster at 2/3 point
+        for (let off of [-25, 0, 25]) {
+          const t = 2/3;
+          const mx = g1.x + dx * t + px * off, mz = g1.z + dz * t + pz * off;
+          const my = g1.y + (g2.y - g1.y) * t;
+          br.push({ x: mx, y: my, z: mz, sz: 25, cl: 0, rt: 0 });
+        }
       }
     }
 
@@ -625,6 +676,46 @@ export default function Game() {
           x.fillStyle = "rgb(200,30,30)";
           x.fillRect(0, -19*u, 4*u, 2.5*u);
           x.restore();
+        }});
+      });
+
+      // Rock arches (Ocean Run)
+      arches.forEach(ar => {
+        const midX = (ar.lx + ar.rx) / 2, midZ = (ar.lz + ar.rz) / 2;
+        const dist = Math.sqrt((midX - vw.x) ** 2 + (midZ - vw.z) ** 2);
+        if (dist > 500) return;
+        const al = Math.max(0.3, 1 - dist / 500);
+        // Left pillar
+        const pLB = proj(ar.lx, ar.y, ar.lz, cam, vh);
+        const pLT = proj(ar.lx, ar.y + ar.ht, ar.lz, cam, vh);
+        // Right pillar
+        const pRB = proj(ar.rx, ar.y, ar.rz, cam, vh);
+        const pRT = proj(ar.rx, ar.y + ar.ht, ar.rz, cam, vh);
+        if (!pLB || !pLT || !pRB || !pRT) return;
+        const avgD = (pLB.d + pRB.d) / 2;
+        // Pillars
+        rn.push({ d: avgD, f() {
+          x.globalAlpha = al;
+          // Left pillar
+          const lw = Math.max(4, ar.w * pLB.sc);
+          x.fillStyle = "rgb(55,45,40)";
+          x.fillRect(pLB.sx - lw / 2, Math.min(pLT.sy, pLB.sy), lw, Math.abs(pLB.sy - pLT.sy) || 2);
+          // Right pillar
+          const rw = Math.max(4, ar.w * pRB.sc);
+          x.fillStyle = "rgb(60,50,42)";
+          x.fillRect(pRB.sx - rw / 2, Math.min(pRT.sy, pRB.sy), rw, Math.abs(pRB.sy - pRT.sy) || 2);
+          // Connecting arch top — curved
+          x.fillStyle = "rgb(75,60,50)";
+          x.beginPath();
+          x.moveTo(pLT.sx - lw / 2, pLT.sy);
+          x.lineTo(pLT.sx + lw / 2, pLT.sy);
+          const cpY = Math.min(pLT.sy, pRT.sy) - 12 * ((pLT.sc + pRT.sc) / 2);
+          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY, pRT.sx - rw / 2, pRT.sy);
+          x.lineTo(pRT.sx + rw / 2, pRT.sy);
+          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY - 5 * ((pLT.sc + pRT.sc) / 2), pLT.sx - lw / 2, pLT.sy);
+          x.closePath();
+          x.fill();
+          x.globalAlpha = 1;
         }});
       });
 
