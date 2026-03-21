@@ -86,7 +86,7 @@ export default function Game() {
     });
 
     const cm = rs.filter(r => !r.npc).map(r => ({ x: r.x, y: r.y + 20, z: r.z - 50, lx: r.x, ly: r.y, lz: r.z }));
-    let pj = [], fc = 0, cd = 180, started = 0, rt = 0, fo = [];
+    let pj = [], fc = 0, cd = 240, started = 0, rt = 0, fo = [];
 
     function boom(p) {
       if (p.st > 0) return;
@@ -355,17 +355,21 @@ export default function Game() {
         }});
       });
 
-      // Track outline (lines connecting gates)
+      // Track rails (left and right lines along gate edges)
       if (!iB && crs.length > 1) {
-        x.strokeStyle = "rgba(255,180,50,0.25)";
-        x.lineWidth = 2;
+        x.strokeStyle = "rgba(255,180,50,0.2)";
+        x.lineWidth = 1.5;
         for (let i = 0; i < crs.length; i++) {
           const g1 = crs[i], g2 = crs[(i + 1) % crs.length];
-          const p1 = proj(g1.x, g1.y, g1.z, cam, vh);
-          const p2 = proj(g2.x, g2.y, g2.z, cam, vh);
-          if (p1 && p2) {
-            x.beginPath(); x.moveTo(p1.sx, p1.sy); x.lineTo(p2.sx, p2.sy); x.stroke();
-          }
+          const dx = g2.x - g1.x, dz = g2.z - g1.z;
+          const len = Math.sqrt(dx * dx + dz * dz) || 1;
+          const px = -dz / len * 30, pz = dx / len * 30;
+          const lA = proj(g1.x + px, g1.y, g1.z + pz, cam, vh);
+          const lB = proj(g2.x + px, g2.y, g2.z + pz, cam, vh);
+          const rA = proj(g1.x - px, g1.y, g1.z - pz, cam, vh);
+          const rB = proj(g2.x - px, g2.y, g2.z - pz, cam, vh);
+          if (lA && lB) { x.beginPath(); x.moveTo(lA.sx, lA.sy); x.lineTo(lB.sx, lB.sy); x.stroke(); }
+          if (rA && rB) { x.beginPath(); x.moveTo(rA.sx, rA.sy); x.lineTo(rB.sx, rB.sy); x.stroke(); }
         }
       }
 
@@ -470,14 +474,16 @@ export default function Game() {
       }
       if (cd > 0) {
         const sec = Math.ceil(cd / 60);
-        if (sec <= 3) { x.fillStyle = sec === 1 ? "#22c55e" : "#fbbf24"; x.font = "bold " + (i2 ? 30 : 48) + "px Georgia"; x.textAlign = "center"; x.fillText(sec === 1 ? "GO!" : sec - 1, W / 2, vh / 2); x.textAlign = "start"; }
+        if (sec <= 3) { x.fillStyle = sec === 1 ? "#f97316" : "#fbbf24"; x.font = "bold " + (i2 ? 30 : 48) + "px Georgia"; x.textAlign = "center"; x.fillText(sec, W / 2, vh / 2); x.textAlign = "start"; }
+      } else if (started && fc - 240 < 40) {
+        x.fillStyle = "#22c55e"; x.font = "bold " + (i2 ? 30 : 48) + "px Georgia"; x.textAlign = "center"; x.fillText("GO!", W / 2, vh / 2); x.textAlign = "start";
       }
       x.restore();
     }
 
     function mainUpdate() {
       if (cd > 0) { cd--; fc++; return; }
-      if (!started) { started = 1; rs.forEach(r => { r.th = 0.5; r.sp = 4; }); }
+      if (!started) { started = 1; rs.forEach(r => { r.th = 0.2; r.sp = 1; }); }
       rt++;
 
       const pl = rs.filter(r => !r.npc);
