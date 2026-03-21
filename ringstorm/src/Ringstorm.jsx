@@ -28,24 +28,31 @@ export default function Game() {
 
     // Course gates
     const crs = [];
-    const baseY = cr === 1 ? 220 : 180;
+    const baseY = cr === 3 ? 80 : cr === 1 ? 220 : 180;
+    const yVar = cr === 3 ? 15 : 30;
     if (!iB) {
       for (let i = 0; i < NG; i++) {
         const a = (i / NG) * Math.PI * 2;
-        crs.push({ x: Math.cos(a) * 1200 + Math.cos(a * 2) * 60, y: baseY + Math.sin(a * 2 + 1) * 30, z: Math.sin(a) * 1200 + Math.sin(a * 3) * 50, sz: 55 });
+        crs.push({ x: Math.cos(a) * 1200 + Math.cos(a * 2) * 60, y: baseY + Math.sin(a * 2 + 1) * yVar, z: Math.sin(a) * 1200 + Math.sin(a * 3) * 50, sz: 55 });
       }
     }
 
     // Powerup rings
     const br = [];
+    const ringMinY = cr === 3 ? 60 : 140, ringRangeY = cr === 3 ? 60 : 160;
     for (let i = 0; i < (iB ? 16 : 20); i++) {
       const a = (i / (iB ? 16 : 20)) * Math.PI * 2, r = iB ? 200 + Math.random() * 350 : 300 + Math.random() * 500;
-      br.push({ x: Math.cos(a) * r + (Math.random() - 0.5) * 120, y: 140 + Math.random() * 160, z: Math.sin(a) * r + (Math.random() - 0.5) * 120, sz: 25, cl: 0, rt: 0 });
+      br.push({ x: Math.cos(a) * r + (Math.random() - 0.5) * 120, y: ringMinY + Math.random() * ringRangeY, z: Math.sin(a) * r + (Math.random() - 0.5) * 120, sz: 25, cl: 0, rt: 0 });
     }
 
     // Simple terrain
     const TS = 3500, GR = 20, tH = [];
-    for (let i = 0; i <= GR; i++) { tH[i] = []; for (let j = 0; j <= GR; j++) { const a = i / GR * 6, b = j / GR * 6; tH[i][j] = Math.sin(a * 1.2) * Math.cos(b * 0.8) * 80 + Math.sin(a * 2.5 + 1) * Math.cos(b * 1.8 + 2) * 40; } }
+    if (cr === 3) {
+      // Ocean course — flat water
+      for (let i = 0; i <= GR; i++) { tH[i] = []; for (let j = 0; j <= GR; j++) { tH[i][j] = -30 + Math.sin(i * 0.5) * 5 + Math.cos(j * 0.4) * 5; } }
+    } else {
+      for (let i = 0; i <= GR; i++) { tH[i] = []; for (let j = 0; j <= GR; j++) { const a = i / GR * 6, b = j / GR * 6; tH[i][j] = Math.sin(a * 1.2) * Math.cos(b * 0.8) * 80 + Math.sin(a * 2.5 + 1) * Math.cos(b * 1.8 + 2) * 40; } }
+    }
     function gH(wx, wz) {
       const gx = ((wx + TS / 2) / TS) * GR, gz = ((wz + TS / 2) / TS) * GR;
       const ix = Math.max(0, Math.min(GR - 1, Math.floor(gx))), iz = Math.max(0, Math.min(GR - 1, Math.floor(gz)));
@@ -113,6 +120,23 @@ export default function Game() {
       }
     }
 
+    // Course 3 (Ocean Run): rock pillars sticking out of the ocean
+    if (!iB && cr === 3 && crs.length > 1) {
+      for (let i = 0; i < 12; i++) {
+        const gi = Math.floor(Math.random() * NG);
+        const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
+        const t = Math.random();
+        const dx = g2.x - g1.x, dz = g2.z - g1.z;
+        const len = Math.sqrt(dx * dx + dz * dz) || 1;
+        const px = -dz / len, pz = dx / len;
+        const side = Math.random() < 0.5 ? 1 : -1;
+        const off = 60 + Math.random() * 100;
+        const mx = g1.x + dx * t + px * off * side;
+        const mz = g1.z + dz * t + pz * off * side;
+        mts.push({ x: mx, z: mz, bY: gH(mx, mz), ht: 40 + Math.random() * 40, w: 15 + Math.random() * 20 });
+      }
+    }
+
     // Grand Canyon — continuous walls along course (Course 0 only)
     const canyon = [];
     const canyonL = [], canyonR = [];
@@ -161,7 +185,8 @@ export default function Game() {
       { id: "n3", nm: "STORM", ac: "#a855f7", cp: "#c084fc", sc: "#1a1a1a", npc: 1 },
     ];
     const ads = iB ? (i2 ? defs.slice(0, 2) : [defs[0], defs[2]]) : (i2 ? defs : [defs[0], ...defs.slice(2)]);
-    const sp = iB ? { x: 0, y: 200, z: 0 } : (crs[0] || { x: 0, y: 200, z: 0 });
+    const startY = cr === 3 ? 100 : 200;
+    const sp = iB ? { x: 0, y: 200, z: 0 } : (crs[0] ? { ...crs[0], y: startY } : { x: 0, y: startY, z: 0 });
     const sd = (!iB && crs.length > 1) ? Math.atan2(crs[0].x - crs[NG - 1].x, crs[0].z - crs[NG - 1].z) : 0;
 
     const rs = ads.map((d, i) => {
@@ -399,12 +424,20 @@ export default function Game() {
           if (!p00 && !p10 && !p01 && !p11) continue;
           const h = tH[i][j];
           let r, g, b;
-          // 6-band smooth terrain: deep water, shallow water, beach, grass, rock, snow
-          const bands = [[-60,20,40,90],[-20,35,55,100],[0,65,60,45],[20,50,95,40],[50,130,115,85],[90,220,220,230]];
-          let bi = 0;
-          while (bi < bands.length - 1 && h > bands[bi + 1][0]) bi++;
-          if (bi >= bands.length - 1) { r = bands[bands.length-1][1]; g = bands[bands.length-1][2]; b = bands[bands.length-1][3]; }
-          else { const lo = bands[bi], hi = bands[bi+1]; const t = Math.max(0, Math.min(1, (h - lo[0]) / (hi[0] - lo[0]))); r = lo[1] + (hi[1] - lo[1]) * t; g = lo[2] + (hi[2] - lo[2]) * t; b = lo[3] + (hi[3] - lo[3]) * t; }
+          if (cr === 3) {
+            // Ocean course — water colors
+            const wt = Math.max(0, Math.min(1, (h + 35) / 10));
+            r = 20 + wt * 10; g = 60 + wt * 20; b = 120 + wt * 20;
+            // Foam highlights at wave peaks
+            if (h > -27) { const foam = (h + 27) / 5; r += foam * 140; g += foam * 120; b += foam * 80; }
+          } else {
+            // 6-band smooth terrain: deep water, shallow water, beach, grass, rock, snow
+            const bands = [[-60,20,40,90],[-20,35,55,100],[0,65,60,45],[20,50,95,40],[50,130,115,85],[90,220,220,230]];
+            let bi = 0;
+            while (bi < bands.length - 1 && h > bands[bi + 1][0]) bi++;
+            if (bi >= bands.length - 1) { r = bands[bands.length-1][1]; g = bands[bands.length-1][2]; b = bands[bands.length-1][3]; }
+            else { const lo = bands[bi], hi = bands[bi+1]; const t = Math.max(0, Math.min(1, (h - lo[0]) / (hi[0] - lo[0]))); r = lo[1] + (hi[1] - lo[1]) * t; g = lo[2] + (hi[2] - lo[2]) * t; b = lo[3] + (hi[3] - lo[3]) * t; }
+          }
           const sh = Math.max(0.3, 1 - dist / vD);
           rn.push({ d: ((p00?.d || 9999) + (p10?.d || 9999)) / 2, f() {
             x.fillStyle = `rgba(${r * sh | 0},${g * sh | 0},${b * sh | 0},${sh})`;
@@ -449,27 +482,51 @@ export default function Game() {
         const dist = Math.sqrt((il.x - vw.x) ** 2 + (il.z - vw.z) ** 2);
         if (dist > 600) return;
         const al = Math.max(0.3, 1 - dist / 600);
-        const pT = proj(il.x, il.y - il.h / 2, il.z, cam, vh);
-        const pB2 = proj(il.x, il.y + il.h / 2, il.z, cam, vh);
-        const pL = proj(il.x - il.w, il.y, il.z, cam, vh);
-        const pR = proj(il.x + il.w, il.y, il.z, cam, vh);
-        const pF = proj(il.x, il.y, il.z - il.w, cam, vh);
-        const pK = proj(il.x, il.y, il.z + il.w, cam, vh);
-        if (!pT || !pB2) return;
-        // Top face — green
-        if (pL && pF && pR && pK) {
-          rn.push({ d: pT.d, f() {
-            x.globalAlpha = al;
-            x.fillStyle = "rgb(50,120,45)";
-            x.beginPath(); x.moveTo(pL.sx, pT.sy); x.lineTo(pF.sx, pT.sy - (pF.sy - pT.sy) * 0.3); x.lineTo(pR.sx, pT.sy); x.lineTo(pK.sx, pT.sy + (pK.sy - pT.sy) * 0.3); x.closePath(); x.fill();
-            // Side faces — brown rock
-            x.fillStyle = "rgb(100,70,40)";
-            x.beginPath(); x.moveTo(pL.sx, pT.sy); x.lineTo(pL.sx, pB2.sy); x.lineTo(pF.sx, pB2.sy); x.lineTo(pF.sx, pT.sy - (pF.sy - pT.sy) * 0.3); x.closePath(); x.fill();
-            x.fillStyle = "rgb(80,55,30)";
-            x.beginPath(); x.moveTo(pF.sx, pT.sy - (pF.sy - pT.sy) * 0.3); x.lineTo(pF.sx, pB2.sy); x.lineTo(pR.sx, pB2.sy); x.lineTo(pR.sx, pT.sy); x.closePath(); x.fill();
-            x.globalAlpha = 1;
-          }});
-        }
+        const topY = il.y - il.h / 2;
+        const botY = il.y + il.h * 1.0;
+        const pC = proj(il.x, topY, il.z, cam, vh);
+        const pBot = proj(il.x, botY, il.z, cam, vh);
+        const pL = proj(il.x - il.w, topY + il.h * 0.15, il.z, cam, vh);
+        const pR = proj(il.x + il.w, topY + il.h * 0.15, il.z, cam, vh);
+        if (!pC || !pBot || !pL || !pR) return;
+        const sw = Math.abs(pR.sx - pL.sx);
+        rn.push({ d: pC.d, f() {
+          x.globalAlpha = al;
+          // Pointy rock bottom — stalactite shape
+          x.fillStyle = "rgb(80,55,35)";
+          x.beginPath(); x.moveTo(pL.sx, pL.sy); x.lineTo(pC.sx, pBot.sy); x.lineTo(pR.sx, pR.sy); x.closePath(); x.fill();
+          // Rock middle layer — wider band
+          const midY = pL.sy + (pBot.sy - pL.sy) * 0.3;
+          x.fillStyle = "rgb(120,80,50)";
+          x.beginPath(); x.moveTo(pL.sx, pL.sy); x.lineTo(pL.sx + sw * 0.15, midY); x.lineTo(pR.sx - sw * 0.15, midY); x.lineTo(pR.sx, pR.sy); x.closePath(); x.fill();
+          // Dirt layer — thin band at top of rock
+          x.fillStyle = "rgb(90,65,40)";
+          const dirtH = Math.max(2, (pBot.sy - pC.sy) * 0.08);
+          x.beginPath(); x.ellipse(pC.sx, pL.sy - dirtH, sw / 2, dirtH, 0, 0, Math.PI * 2); x.fill();
+          // Grass top — green ellipse
+          x.fillStyle = "rgb(60,140,40)";
+          const grassH = Math.max(3, (pBot.sy - pC.sy) * 0.12);
+          x.beginPath(); x.ellipse(pC.sx, pC.sy, sw / 2, grassH, 0, 0, Math.PI * 2); x.fill();
+          x.strokeStyle = "rgb(45,110,30)"; x.lineWidth = 1;
+          x.beginPath(); x.ellipse(pC.sx, pC.sy, sw / 2, grassH, 0, 0, Math.PI * 2); x.stroke();
+          // Trees — if big enough on screen
+          if (sw > 16) {
+            const treeCols = ["rgb(40,120,30)", "rgb(55,145,40)", "rgb(35,100,25)"];
+            const trunkH = sw * 0.18;
+            const canR = sw * 0.07;
+            const treePositions = [-0.25, 0.05, 0.3];
+            for (let ti = 0; ti < 3; ti++) {
+              if (sw < 30 && ti === 2) break;
+              const tx = pC.sx + treePositions[ti] * sw;
+              const tBase = pC.sy - grassH * 0.5;
+              // Trunk
+              x.fillStyle = "rgb(90,60,30)"; x.fillRect(tx - 1, tBase - trunkH, 2, trunkH);
+              // Canopy
+              x.fillStyle = treeCols[ti]; x.beginPath(); x.arc(tx, tBase - trunkH - canR * 0.5, canR, 0, Math.PI * 2); x.fill();
+            }
+          }
+          x.globalAlpha = 1;
+        }});
       });
 
       // Canyon walls — 3D with front face + rim
@@ -846,6 +903,7 @@ export default function Game() {
       { name: "GRAND CANYON", desc: "Race through towering red rock canyon walls", color: "#f97316", emoji: "\u{1F3DC}\u{FE0F}" },
       { name: "ISLAND SKIES", desc: "Weave between floating islands high above the clouds", color: "#22c55e", emoji: "\u{1F3DD}\u{FE0F}" },
       { name: "MOUNTAIN PASS", desc: "Thread the needle between snow-capped peaks", color: "#3b82f6", emoji: "\u{1F3D4}\u{FE0F}" },
+      { name: "OCEAN RUN", desc: "Skim the waves over endless open ocean", color: "#06b6d4", emoji: "\u{1F30A}" },
     ];
     return (
       <div style={{ width: "100%", minHeight: "100vh", background: bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: ft, color: "#e2e8f0", padding: "20px", textAlign: "center" }}>
@@ -853,7 +911,7 @@ export default function Game() {
         <p style={{ fontSize: "11px", color: "#64748b", marginBottom: "20px" }}>{LAPS} laps · {np === 2 ? "2 players" : "1 player"}</p>
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center", marginBottom: "20px", width: "min(560px,95vw)" }}>
           {courses.map((c, i) => (
-            <button key={i} onClick={() => { setCr(i); go("race", np); }} style={{ padding: "16px", background: `linear-gradient(135deg,${c.color}18,${c.color}08)`, border: `2px solid ${c.color}55`, borderRadius: "14px", color: "#e2e8f0", cursor: "pointer", flex: "1", minWidth: "150px", textAlign: "center" }}>
+            <button key={i} onClick={() => { setCr(i); go("race", np); }} style={{ padding: "16px", background: `linear-gradient(135deg,${c.color}18,${c.color}08)`, border: `2px solid ${c.color}55`, borderRadius: "14px", color: "#e2e8f0", cursor: "pointer", flex: "1", minWidth: "140px", maxWidth: "260px", textAlign: "center" }}>
               <div style={{ fontSize: "32px", marginBottom: "6px" }}>{c.emoji}</div>
               <div style={{ fontSize: "14px", fontWeight: 900, color: c.color, letterSpacing: "1px", marginBottom: "4px" }}>{c.name}</div>
               <div style={{ fontSize: "10px", color: "#94a3b8", lineHeight: "1.4" }}>{c.desc}</div>
