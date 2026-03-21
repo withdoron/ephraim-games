@@ -503,7 +503,7 @@ export default function Game() {
         }});
       });
 
-      // Other racers — simplified sci-fi biplane
+      // Other racers — angular sci-fi fighter
       rs.forEach(r => {
         if (r === vw || r.cr || r.fn) return;
         const p = proj(r.x, r.y, r.z, cam, vh);
@@ -512,16 +512,20 @@ export default function Game() {
         rn.push({ d: p.d, f() {
           x.save(); x.translate(p.sx, p.sy); x.rotate(-r.rl);
           const u = s / 11;
-          // Star glow behind
+          // Star glow
           if (r.st > 0) { x.fillStyle = "rgba(255,200,50,0.2)"; x.beginPath(); x.arc(0, 0, 16 * u, 0, Math.PI * 2); x.fill(); }
-          // Lower wing
-          x.fillStyle = r.sc; x.beginPath(); x.moveTo(-18*u, 3*u); x.lineTo(-5*u, 1.5*u); x.lineTo(5*u, 1.5*u); x.lineTo(18*u, 3*u); x.lineTo(5*u, 4*u); x.lineTo(-5*u, 4*u); x.closePath(); x.fill();
-          // Upper wing
-          x.fillStyle = r.sc; x.beginPath(); x.moveTo(-15*u, -2*u); x.lineTo(-4*u, -3*u); x.lineTo(4*u, -3*u); x.lineTo(15*u, -2*u); x.lineTo(4*u, -1*u); x.lineTo(-4*u, -1*u); x.closePath(); x.fill();
-          // Fuselage
-          x.fillStyle = r.ac; x.beginPath(); x.moveTo(0, -10*u); x.lineTo(2.5*u, -3*u); x.lineTo(2.5*u, 6*u); x.lineTo(1.2*u, 8*u); x.lineTo(-1.2*u, 8*u); x.lineTo(-2.5*u, 6*u); x.lineTo(-2.5*u, -3*u); x.closePath(); x.fill();
-          // Wing tips
-          x.fillStyle = r.ac; x.beginPath(); x.arc(-18*u, 3*u, 1.2*u, 0, Math.PI * 2); x.fill(); x.beginPath(); x.arc(18*u, 3*u, 1.2*u, 0, Math.PI * 2); x.fill();
+          // Lower wings — angular delta
+          x.fillStyle = r.sc; x.beginPath(); x.moveTo(-20*u, 3*u); x.lineTo(-4*u, 0); x.lineTo(4*u, 0); x.lineTo(20*u, 3*u); x.lineTo(12*u, 5*u); x.lineTo(-12*u, 5*u); x.closePath(); x.fill();
+          // Upper canards
+          x.fillStyle = r.sc; x.beginPath(); x.moveTo(-12*u, -3*u); x.lineTo(-3*u, -5*u); x.lineTo(3*u, -5*u); x.lineTo(12*u, -3*u); x.lineTo(7*u, -2*u); x.lineTo(-7*u, -2*u); x.closePath(); x.fill();
+          // Fuselage — sharp
+          x.fillStyle = r.ac; x.beginPath(); x.moveTo(0, -12*u); x.lineTo(2*u, -6*u); x.lineTo(3*u, -1*u); x.lineTo(3*u, 6*u); x.lineTo(1.5*u, 9*u); x.lineTo(-1.5*u, 9*u); x.lineTo(-3*u, 6*u); x.lineTo(-3*u, -1*u); x.lineTo(-2*u, -6*u); x.closePath(); x.fill();
+          // Wing tip lights
+          x.shadowColor = r.ac; x.shadowBlur = 4;
+          x.fillStyle = r.ac; x.beginPath(); x.arc(-20*u, 3*u, 1.2*u, 0, Math.PI * 2); x.fill(); x.beginPath(); x.arc(20*u, 3*u, 1.2*u, 0, Math.PI * 2); x.fill();
+          x.shadowBlur = 0;
+          // Exhaust flames
+          if (r.sp > 1) { const ec = r.bt > 0 ? "rgba(50,255,100,0.6)" : r.st > 0 ? "rgba(255,220,80,0.6)" : "rgba(255,180,50,0.5)"; x.fillStyle = ec; x.beginPath(); x.ellipse(-9*u, 9*u, 1*u, 2*u, 0, 0, Math.PI * 2); x.fill(); x.beginPath(); x.ellipse(9*u, 9*u, 1*u, 2*u, 0, 0, Math.PI * 2); x.fill(); }
           x.restore();
         }});
       });
@@ -558,36 +562,68 @@ export default function Game() {
       fogG.addColorStop(0, "rgba(140,180,210,0)"); fogG.addColorStop(0.5, "rgba(140,180,210,0.08)"); fogG.addColorStop(1, "rgba(140,180,210,0.2)");
       x.fillStyle = fogG; x.fillRect(0, 0, W, vh);
 
-      // Own plane — sci-fi biplane
+      // Own plane — angular sci-fi fighter
       if (!vw.cr && !vw.fn) {
         const sx = W / 2, sy = vh / 2 + (i2 ? 14 : 28);
         x.save(); x.translate(sx, sy - vw.p * (i2 ? 10 : 18)); x.rotate(-vw.rl);
         const s = i2 ? 0.85 : 1.3;
         // Star power glow (behind plane)
         if (vw.st > 0) { x.fillStyle = `rgba(255,200,50,${0.1 + Math.sin(fc * 0.3) * 0.05})`; x.beginPath(); x.arc(0, 0, 22 * s, 0, Math.PI * 2); x.fill(); }
-        // Engine glow
-        if (vw.th > 0.3 || vw.bt > 0) { const ga = vw.bt > 0 ? 1 : (vw.th - 0.3) / 0.7; x.fillStyle = `rgba(${vw.bt > 0 ? "50,255,100" : "255," + (150 + ga * 105 | 0) + ",50"},${ga * 0.5})`; x.beginPath(); x.ellipse(-4 * s, 10 * s, 1.2 * s, (1 + ga * 2) * s, 0, 0, Math.PI * 2); x.fill(); x.beginPath(); x.ellipse(4 * s, 10 * s, 1.2 * s, (1 + ga * 2) * s, 0, 0, Math.PI * 2); x.fill(); }
-        // Lower wing
-        x.fillStyle = vw.sc; x.beginPath(); x.moveTo(-20*s, 4*s); x.lineTo(-6*s, 2*s); x.lineTo(6*s, 2*s); x.lineTo(20*s, 4*s); x.lineTo(6*s, 5*s); x.lineTo(-6*s, 5*s); x.closePath(); x.fill();
-        x.strokeStyle = vw.ac; x.lineWidth = 1; x.beginPath(); x.moveTo(-20*s, 4*s); x.lineTo(-6*s, 2*s); x.lineTo(6*s, 2*s); x.lineTo(20*s, 4*s); x.stroke();
-        // Upper wing
-        x.fillStyle = vw.sc; x.beginPath(); x.moveTo(-17*s, -2*s); x.lineTo(-5*s, -3.5*s); x.lineTo(5*s, -3.5*s); x.lineTo(17*s, -2*s); x.lineTo(5*s, -1*s); x.lineTo(-5*s, -1*s); x.closePath(); x.fill();
-        x.strokeStyle = vw.ac; x.beginPath(); x.moveTo(-17*s, -2*s); x.lineTo(-5*s, -3.5*s); x.lineTo(5*s, -3.5*s); x.lineTo(17*s, -2*s); x.stroke();
-        // Wing struts
-        x.strokeStyle = vw.ac; x.lineWidth = 1; x.beginPath(); x.moveTo(-8*s, -2*s); x.lineTo(-8*s, 4*s); x.stroke(); x.beginPath(); x.moveTo(8*s, -2*s); x.lineTo(8*s, 4*s); x.stroke();
-        // Fuselage
-        x.fillStyle = vw.ac; x.beginPath(); x.moveTo(0, -12*s); x.lineTo(3*s, -4*s); x.lineTo(3*s, 7*s); x.lineTo(1.5*s, 9*s); x.lineTo(-1.5*s, 9*s); x.lineTo(-3*s, 7*s); x.lineTo(-3*s, -4*s); x.closePath(); x.fill();
-        // Fuselage highlight
-        x.strokeStyle = "rgba(255,255,255,0.25)"; x.lineWidth = 1; x.beginPath(); x.moveTo(0, -11*s); x.lineTo(0, 8*s); x.stroke();
-        // Tail fins
-        x.fillStyle = vw.ac; x.beginPath(); x.moveTo(-3*s, 7*s); x.lineTo(-6*s, 5*s); x.lineTo(-2*s, 9*s); x.closePath(); x.fill();
-        x.beginPath(); x.moveTo(3*s, 7*s); x.lineTo(6*s, 5*s); x.lineTo(2*s, 9*s); x.closePath(); x.fill();
-        // Engine pods
-        x.fillStyle = "rgba(0,0,0,0.3)"; x.fillRect(-11.25*s, 5*s, 2.5*s, 3*s); x.fillRect(8.75*s, 5*s, 2.5*s, 3*s);
-        // Cockpit
-        x.fillStyle = vw.cp; x.beginPath(); x.ellipse(0, -6*s, 1.5*s, 2.5*s, 0, 0, Math.PI * 2); x.fill();
-        // Wing tips
-        x.fillStyle = vw.ac; x.beginPath(); x.arc(-20*s, 4*s, 1.5*s, 0, Math.PI * 2); x.fill(); x.beginPath(); x.arc(20*s, 4*s, 1.5*s, 0, Math.PI * 2); x.fill();
+        // Energy core glow
+        x.fillStyle = vw.ac.replace(")", ",0.15)").replace("rgb(", "rgba("); x.globalAlpha = 0.15; x.fillStyle = vw.ac; x.beginPath(); x.arc(0, 0, 18 * s, 0, Math.PI * 2); x.fill(); x.globalAlpha = 1;
+        // Engine exhaust (behind wings)
+        if (vw.th > 0.3 || vw.bt > 0) {
+          const ga = vw.bt > 0 ? 1 : (vw.th - 0.3) / 0.7;
+          const ey = vw.bt > 0 ? (2 + ga * 6) : (2 + ga * 3);
+          const ec = vw.bt > 0 ? "rgba(50,255,100,0.8)" : vw.st > 0 ? "rgba(255,220,80,0.8)" : "rgba(255,180,50,0.7)";
+          x.fillStyle = ec;
+          x.beginPath(); x.ellipse(-11*s, 9*s, 1.5*s, ey*s, 0, 0, Math.PI * 2); x.fill();
+          x.beginPath(); x.ellipse(11*s, 9*s, 1.5*s, ey*s, 0, 0, Math.PI * 2); x.fill();
+        }
+        // Lower wings — angular delta
+        x.fillStyle = vw.sc; x.beginPath(); x.moveTo(-22*s, 3*s); x.lineTo(-4*s, 0); x.lineTo(4*s, 0); x.lineTo(22*s, 3*s); x.lineTo(14*s, 5*s); x.lineTo(-14*s, 5*s); x.closePath(); x.fill();
+        // Wing energy lines
+        x.shadowColor = vw.ac; x.shadowBlur = 4;
+        x.strokeStyle = vw.ac; x.lineWidth = 1;
+        x.beginPath(); x.moveTo(-18*s, 3.5*s); x.lineTo(-6*s, 1*s); x.stroke();
+        x.beginPath(); x.moveTo(18*s, 3.5*s); x.lineTo(6*s, 1*s); x.stroke();
+        x.shadowBlur = 0;
+        // Upper wings — forward-swept canards
+        x.fillStyle = vw.sc; x.beginPath(); x.moveTo(-14*s, -3*s); x.lineTo(-4*s, -5*s); x.lineTo(4*s, -5*s); x.lineTo(14*s, -3*s); x.lineTo(8*s, -2*s); x.lineTo(-8*s, -2*s); x.closePath(); x.fill();
+        // Canard energy lines
+        x.shadowColor = vw.ac; x.shadowBlur = 4;
+        x.strokeStyle = vw.ac; x.lineWidth = 1;
+        x.beginPath(); x.moveTo(-12*s, -3*s); x.lineTo(-5*s, -4.5*s); x.stroke();
+        x.beginPath(); x.moveTo(12*s, -3*s); x.lineTo(5*s, -4.5*s); x.stroke();
+        x.shadowBlur = 0;
+        // Engine pods — angular nacelles
+        x.fillStyle = "rgba(0,0,0,0.4)"; x.fillRect(-12.5*s, 3*s, 3*s, 5*s); x.fillRect(9.5*s, 3*s, 3*s, 5*s);
+        // Pod exhaust circles
+        const podC = (vw.th > 0.3 || vw.bt > 0) ? (vw.bt > 0 ? "rgba(50,255,100,0.9)" : "rgba(255,160,40,0.8)") : "rgba(100,80,60,0.4)";
+        x.fillStyle = podC; x.beginPath(); x.arc(-11*s, 8*s, 1.5*s, 0, Math.PI * 2); x.fill(); x.beginPath(); x.arc(11*s, 8*s, 1.5*s, 0, Math.PI * 2); x.fill();
+        // Fuselage — long angular
+        x.fillStyle = vw.ac; x.beginPath(); x.moveTo(0, -14*s); x.lineTo(2*s, -8*s); x.lineTo(3.5*s, -2*s); x.lineTo(3.5*s, 6*s); x.lineTo(2*s, 10*s); x.lineTo(0, 11*s); x.lineTo(-2*s, 10*s); x.lineTo(-3.5*s, 6*s); x.lineTo(-3.5*s, -2*s); x.lineTo(-2*s, -8*s); x.closePath(); x.fill();
+        // Center spine highlight
+        x.strokeStyle = "rgba(255,255,255,0.3)"; x.lineWidth = 1; x.beginPath(); x.moveTo(0, -14*s); x.lineTo(0, 10*s); x.stroke();
+        // Tail fins — twin angular
+        x.fillStyle = vw.ac;
+        x.beginPath(); x.moveTo(-4*s, 7*s); x.lineTo(-7*s, 3*s); x.lineTo(-2.5*s, 10*s); x.closePath(); x.fill();
+        x.beginPath(); x.moveTo(4*s, 7*s); x.lineTo(7*s, 3*s); x.lineTo(2.5*s, 10*s); x.closePath(); x.fill();
+        // Tail fin energy lines
+        x.strokeStyle = "rgba(255,255,255,0.3)"; x.lineWidth = 1;
+        x.beginPath(); x.moveTo(-5.5*s, 5*s); x.lineTo(-3*s, 9*s); x.stroke();
+        x.beginPath(); x.moveTo(5.5*s, 5*s); x.lineTo(3*s, 9*s); x.stroke();
+        // Cockpit — angular hexagon
+        x.fillStyle = vw.cp; x.beginPath(); x.moveTo(0, -9.5*s); x.lineTo(2*s, -8*s); x.lineTo(2*s, -5.5*s); x.lineTo(0, -4.5*s); x.lineTo(-2*s, -5.5*s); x.lineTo(-2*s, -8*s); x.closePath(); x.fill();
+        // Cockpit highlight
+        x.strokeStyle = "rgba(255,255,255,0.5)"; x.lineWidth = 1; x.beginPath(); x.moveTo(-1.5*s, -9*s); x.lineTo(1.5*s, -9*s); x.stroke();
+        // Wing tip lights — pulsing
+        const pulse = 0.7 + Math.sin(fc * 0.15) * 0.3;
+        x.shadowColor = vw.ac; x.shadowBlur = 6;
+        x.globalAlpha = pulse; x.fillStyle = vw.ac;
+        x.beginPath(); x.arc(-22*s, 3*s, 1.5*s, 0, Math.PI * 2); x.fill();
+        x.beginPath(); x.arc(22*s, 3*s, 1.5*s, 0, Math.PI * 2); x.fill();
+        x.globalAlpha = 1; x.shadowBlur = 0;
         x.restore();
       } else if (vw.cr) {
         x.fillStyle = "#ef4444"; x.font = "bold " + (i2 ? 16 : 26) + "px Georgia"; x.textAlign = "center";
