@@ -77,7 +77,7 @@ export default function Game() {
       return {
         ...d, x: sp.x + Math.cos(sd + Math.PI / 2) * ox + Math.sin(sd) * oz,
         y: sp.y + 10, z: sp.z + Math.sin(sd + Math.PI / 2) * ox + Math.cos(sd) * oz,
-        p: 0, yw: sd, rl: 0, sp: 0, ms: d.npc ? 10 + Math.random() * 2 : 12,
+        p: 0, yw: sd, rl: 0, sp: 0, ms: d.npc ? 10 + Math.random() * 2 : 14,
         th: 0, tp: 0, tr: 0, wp: null, wt: 0, st: 0, bt: 0,
         cr: 0, ct: 0, cx: 0, cy: 0, cz: 0, ep: [],
         ng: 0, lp: 0, fn: 0, ft: 0, fp: 0, hf: 0,
@@ -212,7 +212,7 @@ export default function Game() {
       else if (ks[dK]) r.th = Math.max(0, r.th - dt * 0.8);
       else r.th += (0.5 - r.th) * dt * 0.5;
 
-      let ts = 2 + r.th * (r.ms - 2);
+      let ts = 1 + r.th * (r.ms - 1);
       if (r.bt > 0) { ts = r.ms * 1.5; r.bt--; }
       if (r.st > 0) { ts = Math.max(ts, r.ms * 1.3); r.st--; }
       r.sp += (ts - r.sp) * dt * 2;
@@ -354,6 +354,20 @@ export default function Game() {
           x.shadowBlur = 0;
         }});
       });
+
+      // Track outline (lines connecting gates)
+      if (!iB && crs.length > 1) {
+        x.strokeStyle = "rgba(255,180,50,0.25)";
+        x.lineWidth = 2;
+        for (let i = 0; i < crs.length; i++) {
+          const g1 = crs[i], g2 = crs[(i + 1) % crs.length];
+          const p1 = proj(g1.x, g1.y, g1.z, cam, vh);
+          const p2 = proj(g2.x, g2.y, g2.z, cam, vh);
+          if (p1 && p2) {
+            x.beginPath(); x.moveTo(p1.sx, p1.sy); x.lineTo(p2.sx, p2.sy); x.stroke();
+          }
+        }
+      }
 
       // Bonus rings
       br.forEach(b => {
