@@ -208,17 +208,14 @@ export default function Game() {
         return;
       }
 
-      if (ks[uK]) r.th = Math.min(1, r.th + dt * 0.8);
-      else if (ks[dK]) r.th = Math.max(0, r.th - dt * 0.8);
-      else r.th += (0.5 - r.th) * dt * 0.5;
-
+      r.th = 1;
       let ts = 1 + r.th * (r.ms - 1);
       if (r.bt > 0) { ts = r.ms * 1.25; r.bt--; }
       if (r.st > 0) { ts = Math.max(ts, r.ms * 1.2); r.st--; }
       r.sp += (ts - r.sp) * dt * 2;
 
       if (ks[lK]) r.tr = 50 * D; else if (ks[rK]) r.tr = -50 * D; else r.tr = 0;
-      if (ks[upK]) r.tp = 25 * D; else if (ks[dvK]) r.tp = -20 * D; else r.tp *= 0.9;
+      if (ks[uK]) r.tp = 25 * D; else if (ks[dK]) r.tp = -20 * D; else r.tp *= 0.9;
       r.rl += (r.tr - r.rl) * dt * 4;
       r.p += (r.tp - r.p) * dt * 3;
       r.yw += (-r.rl * 2.2 * (r.sp / r.ms)) * dt;
@@ -483,7 +480,7 @@ export default function Game() {
 
     function mainUpdate() {
       if (cd > 0) { cd--; fc++; return; }
-      if (!started) { started = 1; rs.forEach(r => { r.th = 0.2; r.sp = 1; }); }
+      if (!started) { started = 1; rs.forEach(r => { r.th = 1; r.sp = 1; }); }
       rt++;
 
       const pl = rs.filter(r => !r.npc);
@@ -600,18 +597,18 @@ export default function Game() {
         <div style={{ background: "rgba(0,0,0,0.25)", borderRadius: "12px", padding: "16px 20px", border: "2px solid #3b82f644", flex: "1", minWidth: "180px", textAlign: "left" }}>
           <div style={{ color: "#3b82f6", fontWeight: 900, fontSize: "14px", marginBottom: "10px" }}>PLAYER 1 — BLUE</div>
           <div style={{ fontSize: "12px", color: "#94a3b8", lineHeight: "2" }}>
-            <div><b style={{ color: "#e2e8f0" }}>W/S</b> Throttle</div>
+            <div><b style={{ color: "#e2e8f0" }}>W</b> Rise</div>
+            <div><b style={{ color: "#e2e8f0" }}>S</b> Dive</div>
             <div><b style={{ color: "#e2e8f0" }}>A/D</b> Turn</div>
-            <div><b style={{ color: "#e2e8f0" }}>Space</b> Up · <b style={{ color: "#e2e8f0" }}>Q</b> Dive</div>
             <div><b style={{ color: "#e2e8f0" }}>F</b> Weapon</div>
           </div>
         </div>
         <div style={{ background: "rgba(0,0,0,0.25)", borderRadius: "12px", padding: "16px 20px", border: "2px solid #ef444444", flex: "1", minWidth: "180px", textAlign: "left" }}>
           <div style={{ color: "#ef4444", fontWeight: 900, fontSize: "14px", marginBottom: "10px" }}>PLAYER 2 — RED</div>
           <div style={{ fontSize: "12px", color: "#94a3b8", lineHeight: "2" }}>
-            <div><b style={{ color: "#e2e8f0" }}>↑/↓</b> Throttle</div>
+            <div><b style={{ color: "#e2e8f0" }}>↑</b> Rise</div>
+            <div><b style={{ color: "#e2e8f0" }}>↓</b> Dive</div>
             <div><b style={{ color: "#e2e8f0" }}>←/→</b> Turn</div>
-            <div><b style={{ color: "#e2e8f0" }}>/</b> Up · <b style={{ color: "#e2e8f0" }}>.</b> Dive</div>
             <div><b style={{ color: "#e2e8f0" }}>Shift</b> Weapon</div>
           </div>
         </div>
