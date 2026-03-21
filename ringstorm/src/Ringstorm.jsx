@@ -58,7 +58,7 @@ export default function Game() {
         let h = Math.sin(a * 1.2) * Math.cos(b * 0.8) * 50 + Math.sin(a * 2.5 + 1) * Math.cos(b * 1.8 + 2) * 25;
         const wx = -TS / 2 + (i / GR) * TS, wz = -TS / 2 + (j / GR) * TS;
         const distC = Math.sqrt(wx * wx + wz * wz);
-        h += 280 * Math.max(0, 1 - distC / 500);
+        h += 350 * Math.max(0, 1 - distC / 500);
         tH[i][j] = h;
       } }
     } else {
@@ -126,7 +126,7 @@ export default function Game() {
           const off = 60 + Math.random() * 120;
           const ix = cx + px * off * side + (Math.random() - 0.5) * 40;
           const iz = cz + pz * off * side + (Math.random() - 0.5) * 40;
-          islands.push({ x: ix, z: iz, y: 160 + Math.random() * 100, w: 30 + Math.random() * 40, h: 15 + Math.random() * 25 });
+          islands.push({ x: ix, z: iz, y: 160 + Math.random() * 100, w: 20 + Math.random() * 35, h: 10 + Math.random() * 15 });
         }
       }
     }
@@ -178,8 +178,8 @@ export default function Game() {
     }
     const lavaP = [];
     if (!iB && cr === 4) {
-      for (let i = 0; i < 8; i++) {
-        lavaP.push({ x: (Math.random() - 0.5) * 60, y: 200 + Math.random() * 80, z: (Math.random() - 0.5) * 60, vy: 0.3 + Math.random() * 0.5, phase: Math.random() * Math.PI * 2 });
+      for (let i = 0; i < 14; i++) {
+        lavaP.push({ x: (Math.random() - 0.5) * 60, y: 260 + Math.random() * 100, z: (Math.random() - 0.5) * 60, vy: 0.3 + Math.random() * 0.5, phase: Math.random() * Math.PI * 2 });
       }
     }
 
@@ -219,6 +219,16 @@ export default function Game() {
         const rx = g1.x + (g2.x - g1.x) * t + (Math.random() - 0.5) * 80;
         const rz = g1.z + (g2.z - g1.z) * t + (Math.random() - 0.5) * 80;
         br.push({ x: rx, y: 160 + Math.random() * 60, z: rz, sz: 25, cl: 0, rt: 0 });
+      }
+    }
+
+    // On-track powerup rings — placed between every other pair of gates (all courses)
+    if (!iB && crs.length > 1) {
+      for (let i = 0; i < NG; i += 2) {
+        const g1 = crs[i], g2 = crs[(i + 1) % NG];
+        const mx = (g1.x + g2.x) / 2, mz = (g1.z + g2.z) / 2;
+        const my = (g1.y + g2.y) / 2 + (Math.random() - 0.5) * 40;
+        br.push({ x: mx + (Math.random() - 0.5) * 30, y: my, z: mz + (Math.random() - 0.5) * 30, sz: 25, cl: 0, rt: 0 });
       }
     }
 
@@ -477,8 +487,12 @@ export default function Game() {
             // Foam highlights at wave peaks
             if (h > -27) { const foam = (h + 27) / 5; r += foam * 140; g += foam * 120; b += foam * 80; }
           } else if (cr === 4) {
-            // Volcano course — lava and volcanic rock
+            // Volcano course — lava and volcanic rock with lava streaks on slopes
+            const wx2 = -TS / 2 + i * stp + stp, wz2 = -TS / 2 + j * stp + stp;
+            const dO = Math.sqrt(wx2 * wx2 + wz2 * wz2);
+            const isLavaStreak = dO > 100 && dO < 450 && h > 30 && Math.sin(i * 2.3 + j * 0.7) > 0.6;
             if (h < 0) { const lv = Math.sin(i * 1.3 + j * 0.7) * 0.5 + 0.5; r = 200 + lv * 40; g = 60 + lv * 60; b = 20 + lv * 10; }
+            else if (isLavaStreak) { r = 220; g = 90; b = 20; }
             else if (h < 60) { r = 40; g = 35; b = 30; }
             else if (h < 150) { const t = (h - 60) / 90; r = 40 + t * 30; g = 35 + t * 30; b = 30 + t * 30; }
             else { r = 90; g = 40; b = 30; }
@@ -541,48 +555,47 @@ export default function Game() {
         const dist = Math.sqrt((il.x - vw.x) ** 2 + (il.z - vw.z) ** 2);
         if (dist > 600) return;
         const al = Math.max(0.3, 1 - dist / 600);
-        const grassY = il.y + il.h / 2;       // top of island (high world Y → high on screen)
-        const pointY = il.y - il.h * 1.0;     // stalactite tip (low world Y → low on screen)
-        const edgeY = il.y;                    // middle where edges are
+        const grassY = il.y + il.h / 2;
+        const pointY = il.y - il.h * 1.0;
+        const edgeY = il.y - il.h * 0.1;
+        const edgeW = il.w * 0.6;             // stalactite starts narrower than grass
         const pGrass = proj(il.x, grassY, il.z, cam, vh);
         const pPoint = proj(il.x, pointY, il.z, cam, vh);
-        const pL = proj(il.x - il.w, edgeY, il.z, cam, vh);
-        const pR = proj(il.x + il.w, edgeY, il.z, cam, vh);
+        const pL = proj(il.x - edgeW, edgeY, il.z, cam, vh);
+        const pR = proj(il.x + edgeW, edgeY, il.z, cam, vh);
         if (!pGrass || !pPoint || !pL || !pR) return;
         const sw = Math.abs(pR.sx - pL.sx);
-        // On screen: pGrass.sy < pL.sy < pPoint.sy (grass highest, point lowest)
+        const grassW = sw / 0.6;              // full grass width on screen
         rn.push({ d: pGrass.d, f() {
           x.globalAlpha = al;
-          // Pointy rock bottom — stalactite shape (drawn first, behind everything)
+          // Pointy rock bottom — stalactite tapering from edges to point
           x.fillStyle = "rgb(80,55,35)";
           x.beginPath(); x.moveTo(pL.sx, pL.sy); x.lineTo(pGrass.sx, pPoint.sy); x.lineTo(pR.sx, pR.sy); x.closePath(); x.fill();
-          // Rock middle layer — wider band above the point
+          // Rock middle layer
           const midSy = pL.sy + (pPoint.sy - pL.sy) * 0.3;
           x.fillStyle = "rgb(120,80,50)";
-          x.beginPath(); x.moveTo(pL.sx, pL.sy); x.lineTo(pL.sx + sw * 0.15, midSy); x.lineTo(pR.sx - sw * 0.15, midSy); x.lineTo(pR.sx, pR.sy); x.closePath(); x.fill();
-          // Dirt layer — thin band just below the grass
+          x.beginPath(); x.moveTo(pL.sx, pL.sy); x.lineTo(pL.sx + sw * 0.2, midSy); x.lineTo(pR.sx - sw * 0.2, midSy); x.lineTo(pR.sx, pR.sy); x.closePath(); x.fill();
+          // Dirt layer — thin band just below grass
           x.fillStyle = "rgb(90,65,40)";
           const dirtH = Math.max(2, Math.abs(pPoint.sy - pGrass.sy) * 0.06);
-          x.beginPath(); x.ellipse(pGrass.sx, pL.sy, sw / 2, dirtH, 0, 0, Math.PI * 2); x.fill();
-          // Grass top — green ellipse at the top
+          x.beginPath(); x.ellipse(pGrass.sx, pL.sy, grassW / 2, dirtH, 0, 0, Math.PI * 2); x.fill();
+          // Grass top — rounder (radiusY closer to radiusX)
           x.fillStyle = "rgb(60,140,40)";
-          const grassH = Math.max(3, Math.abs(pPoint.sy - pGrass.sy) * 0.1);
-          x.beginPath(); x.ellipse(pGrass.sx, pGrass.sy, sw / 2, grassH, 0, 0, Math.PI * 2); x.fill();
+          const grassRx = grassW / 2, grassRy = grassW / 3;
+          x.beginPath(); x.ellipse(pGrass.sx, pGrass.sy, grassRx, Math.max(3, grassRy), 0, 0, Math.PI * 2); x.fill();
           x.strokeStyle = "rgb(45,110,30)"; x.lineWidth = 1;
-          x.beginPath(); x.ellipse(pGrass.sx, pGrass.sy, sw / 2, grassH, 0, 0, Math.PI * 2); x.stroke();
-          // Trees — on top of the grass (even higher on screen = smaller sy)
-          if (sw > 16) {
+          x.beginPath(); x.ellipse(pGrass.sx, pGrass.sy, grassRx, Math.max(3, grassRy), 0, 0, Math.PI * 2); x.stroke();
+          // Trees — shorter and smaller
+          if (grassW > 16) {
             const treeCols = ["rgb(40,120,30)", "rgb(55,145,40)", "rgb(35,100,25)"];
-            const trunkH = sw * 0.18;
-            const canR = sw * 0.07;
-            const treePositions = [-0.25, 0.05, 0.3];
+            const trunkH = grassW * 0.12;
+            const canR = grassW * 0.06;
+            const treePositions = [-0.2, 0.05, 0.22];
             for (let ti = 0; ti < 3; ti++) {
-              if (sw < 30 && ti === 2) break;
-              const tx = pGrass.sx + treePositions[ti] * sw;
+              if (grassW < 30 && ti === 2) break;
+              const tx = pGrass.sx + treePositions[ti] * grassW;
               const tBase = pGrass.sy;
-              // Trunk — grows upward (decreasing sy)
               x.fillStyle = "rgb(90,60,30)"; x.fillRect(tx - 1, tBase - trunkH, 2, trunkH);
-              // Canopy
               x.fillStyle = treeCols[ti]; x.beginPath(); x.arc(tx, tBase - trunkH - canR * 0.5, canR, 0, Math.PI * 2); x.fill();
             }
           }
@@ -622,27 +635,29 @@ export default function Game() {
 
       // Volcano peak glow + lava particles (Course 4)
       if (cr === 4) {
-        const vp = proj(0, 280, 0, cam, vh);
+        const vp = proj(0, 350, 0, cam, vh);
         if (vp && vp.d < 800) {
           rn.push({ d: vp.d, f() {
-            x.globalAlpha = 0.3; x.fillStyle = "rgba(255,80,20,1)";
-            x.beginPath(); x.arc(vp.sx, vp.sy, 40 * vp.sc, 0, Math.PI * 2); x.fill();
-            x.globalAlpha = 0.4; x.fillStyle = "rgba(255,150,50,1)";
-            x.beginPath(); x.arc(vp.sx, vp.sy, 20 * vp.sc, 0, Math.PI * 2); x.fill();
+            x.globalAlpha = 0.2; x.fillStyle = "rgb(255,50,10)";
+            x.beginPath(); x.arc(vp.sx, vp.sy, 60 * vp.sc, 0, Math.PI * 2); x.fill();
+            x.globalAlpha = 0.3; x.fillStyle = "rgb(255,100,30)";
+            x.beginPath(); x.arc(vp.sx, vp.sy, 35 * vp.sc, 0, Math.PI * 2); x.fill();
+            x.globalAlpha = 0.5; x.fillStyle = "rgb(255,180,50)";
+            x.beginPath(); x.arc(vp.sx, vp.sy, 15 * vp.sc, 0, Math.PI * 2); x.fill();
             x.globalAlpha = 1;
           }});
         }
-        // Lava particles — drift upward
+        // Lava particles — drift upward (14 particles, larger)
         lavaP.forEach(lp => {
           lp.y += lp.vy;
-          if (lp.y > 350) { lp.y = 200 + Math.random() * 30; lp.x = (Math.random() - 0.5) * 60; lp.z = (Math.random() - 0.5) * 60; }
+          if (lp.y > 420) { lp.y = 260 + Math.random() * 40; lp.x = (Math.random() - 0.5) * 60; lp.z = (Math.random() - 0.5) * 60; }
           const pp = proj(lp.x, lp.y, lp.z, cam, vh);
           if (!pp) return;
           const flicker = 0.5 + Math.sin(fc * 0.1 + lp.phase) * 0.3;
           rn.push({ d: pp.d, f() {
             x.globalAlpha = flicker;
             x.fillStyle = Math.random() > 0.5 ? "rgb(255,100,30)" : "rgb(255,180,50)";
-            x.beginPath(); x.arc(pp.sx, pp.sy, Math.max(2, 4 * pp.sc), 0, Math.PI * 2); x.fill();
+            x.beginPath(); x.arc(pp.sx, pp.sy, Math.max(4, 8 * pp.sc), 0, Math.PI * 2); x.fill();
             x.globalAlpha = 1;
           }});
         });
