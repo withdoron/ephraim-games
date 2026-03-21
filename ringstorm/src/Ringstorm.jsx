@@ -59,6 +59,27 @@ export default function Game() {
       mts.push({ x: mx, z: mz, bY: gH(mx, mz), ht: 150 + Math.random() * 170, w: 50 + Math.random() * 55 });
     }
 
+    // Canyon walls along course segments
+    const canyon = [];
+    if (!iB && crs.length > 1) {
+      const segs = [[2, 5], [7, 9], [10, 11]];
+      segs.forEach(([s, e]) => {
+        for (let i = s; i <= e && i < NG; i++) {
+          const g1 = crs[i], g2 = crs[(i + 1) % NG];
+          const dx = g2.x - g1.x, dz = g2.z - g1.z;
+          const len = Math.sqrt(dx * dx + dz * dz) || 1;
+          const px = -dz / len, pz = dx / len;
+          const off = 65 + Math.random() * 15;
+          const ht = 120 + Math.random() * 80;
+          const w = 20 + Math.random() * 10;
+          const lx = g1.x + px * off, lz = g1.z + pz * off;
+          const rx = g1.x - px * off, rz = g1.z - pz * off;
+          canyon.push({ x: lx, z: lz, bY: gH(lx, lz), ht, w });
+          canyon.push({ x: rx, z: rz, bY: gH(rx, rz), ht, w });
+        }
+      });
+    }
+
     // Racers
     const defs = [
       { id: "p1", nm: "BLUE", ac: "#3b82f6", cp: "#60a5fa", npc: 0 },
@@ -77,7 +98,7 @@ export default function Game() {
       return {
         ...d, x: sp.x + Math.cos(sd + Math.PI / 2) * ox + Math.sin(sd) * oz,
         y: sp.y + 10, z: sp.z + Math.sin(sd + Math.PI / 2) * ox + Math.cos(sd) * oz,
-        p: 0, yw: sd, rl: 0, sp: 0, ms: d.npc ? 7 + Math.random() * 1.5 : 8,
+        p: 0, yw: sd, rl: 0, sp: 0, ms: d.npc ? 5.5 + Math.random() * 1 : 6,
         th: 0, tp: 0, tr: 0, wp: null, wt: 0, st: 0, bt: 0,
         cr: 0, ct: 0, cx: 0, cy: 0, cz: 0, ep: [],
         ng: 0, lp: 0, fn: 0, ft: 0, fp: 0, hf: 0,
@@ -118,6 +139,10 @@ export default function Game() {
         const d = Math.sqrt((r.x - m.x) ** 2 + (r.z - m.z) ** 2);
         const hf = Math.max(0, Math.min(1, (r.y - m.bY) / m.ht));
         if (d < m.w * 0.8 * (1 - hf * 0.7) + 10 && r.y < m.bY + m.ht && r.y > m.bY) { boom(r); return 1; }
+      }
+      for (const c of canyon) {
+        const d = Math.sqrt((r.x - c.x) ** 2 + (r.z - c.z) ** 2);
+        if (d < c.w + 10 && r.y < c.bY + c.ht && r.y > c.bY) { boom(r); return 1; }
       }
       if (r.y > 600) r.y = 600;
       return 0;
@@ -334,6 +359,27 @@ export default function Game() {
             x.globalAlpha = 1;
           }});
         });
+      });
+
+      // Canyon walls
+      canyon.forEach(c => {
+        const dist = Math.sqrt((c.x - vw.x) ** 2 + (c.z - vw.z) ** 2);
+        if (dist > 500) return;
+        const al = Math.max(0.2, 1 - dist / 500);
+        const pT = proj(c.x, c.bY + c.ht, c.z, cam, vh);
+        const pB1 = proj(c.x - c.w * 0.5, c.bY, c.z, cam, vh);
+        const pB2 = proj(c.x + c.w * 0.5, c.bY, c.z, cam, vh);
+        if (!pT || !pB1 || !pB2) return;
+        rn.push({ d: (pT.d + pB1.d) / 2, f() {
+          x.globalAlpha = al;
+          x.fillStyle = `rgb(${90 * 0.7 | 0},${75 * 0.7 | 0},${60 * 0.7 | 0})`;
+          x.beginPath(); x.moveTo(pB1.sx, pB1.sy); x.lineTo(pT.sx, pT.sy); x.lineTo(pB2.sx, pB2.sy); x.closePath(); x.fill();
+          x.fillStyle = `rgb(${90 * 0.5 | 0},${75 * 0.5 | 0},${60 * 0.5 | 0})`;
+          const pT2 = proj(c.x, c.bY + c.ht, c.z + c.w * 0.5, cam, vh);
+          const pB3 = proj(c.x + c.w * 0.5, c.bY, c.z + c.w * 0.5, cam, vh);
+          if (pT2 && pB3) { x.beginPath(); x.moveTo(pB2.sx, pB2.sy); x.lineTo(pT.sx, pT.sy); x.lineTo(pT2.sx, pT2.sy); x.lineTo(pB3.sx, pB3.sy); x.closePath(); x.fill(); }
+          x.globalAlpha = 1;
+        }});
       });
 
       // Course gates
