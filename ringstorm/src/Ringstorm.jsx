@@ -30,7 +30,7 @@ export default function Game() {
     if (!iB) {
       for (let i = 0; i < NG; i++) {
         const a = (i / NG) * Math.PI * 2;
-        crs.push({ x: Math.cos(a) * 900 + Math.cos(a * 2) * 100, y: 180 + Math.sin(a * 2 + 1) * 50, z: Math.sin(a) * 900 + Math.sin(a * 3) * 80, sz: 42 });
+        crs.push({ x: Math.cos(a) * 1200 + Math.cos(a * 2) * 60, y: 180 + Math.sin(a * 2 + 1) * 30, z: Math.sin(a) * 1200 + Math.sin(a * 3) * 50, sz: 55 });
       }
     }
 
@@ -170,7 +170,7 @@ export default function Game() {
 
       r.tr = -Math.max(-50 * D, Math.min(50 * D, yd * 2.5));
       r.rl += (r.tr - r.rl) / 18;
-      r.yw += (-r.rl * 1.8 * (r.sp / r.ms)) / 60;
+      r.yw += (-r.rl * 2.2 * (r.sp / r.ms)) / 60;
       r.tp = Math.max(-15 * D, Math.min(15 * D, (dy / Math.max(50, dH)) * 40 * D));
       r.p += (r.tp - r.p) / 24;
 
@@ -221,7 +221,7 @@ export default function Game() {
       if (ks[upK]) r.tp = 25 * D; else if (ks[dvK]) r.tp = -20 * D; else r.tp *= 0.9;
       r.rl += (r.tr - r.rl) * dt * 4;
       r.p += (r.tp - r.p) * dt * 3;
-      r.yw += (-r.rl * 1.8 * (r.sp / r.ms)) * dt;
+      r.yw += (-r.rl * 2.2 * (r.sp / r.ms)) * dt;
 
       const { sy, sp2, cy } = moveRacer(r, dt);
 
