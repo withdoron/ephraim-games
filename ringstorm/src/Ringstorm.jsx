@@ -345,12 +345,23 @@ export default function Game() {
     const sd = (!iB && crs.length > 1) ? Math.atan2(crs[0].x - crs[NG - 1].x, crs[0].z - crs[NG - 1].z) : 0;
 
     const rs = ads.map((d, i) => {
-      const row = Math.floor(i / 2), col = i % 2;
-      const ox = (col === 0 ? -20 : 20), oz = -row * 45 - 70;
+      let sx, sy2, sz, syw;
+      if (iB) {
+        // Battle: wide circle, facing tangent direction
+        const ang = (i / ads.length) * Math.PI * 2;
+        sx = Math.cos(ang) * 200; sy2 = 200; sz = Math.sin(ang) * 200;
+        syw = ang + Math.PI / 2; // tangent to circle
+      } else {
+        const row = Math.floor(i / 2), col = i % 2;
+        const ox = (col === 0 ? -20 : 20), oz = -row * 45 - 70;
+        sx = sp.x + Math.cos(sd + Math.PI / 2) * ox + Math.sin(sd) * oz;
+        sy2 = sp.y + 10;
+        sz = sp.z + Math.sin(sd + Math.PI / 2) * ox + Math.cos(sd) * oz;
+        syw = sd;
+      }
       return {
-        ...d, x: sp.x + Math.cos(sd + Math.PI / 2) * ox + Math.sin(sd) * oz,
-        y: sp.y + 10, z: sp.z + Math.sin(sd + Math.PI / 2) * ox + Math.cos(sd) * oz,
-        p: 0, yw: sd, rl: 0, sp: 0, ms: d.npc ? 3.7 + Math.random() * 0.7 : 4,
+        ...d, x: sx, y: sy2, z: sz,
+        p: 0, yw: syw, rl: 0, sp: 0, ms: d.npc ? 3.7 + Math.random() * 0.7 : 4,
         th: 0, tp: 0, tr: 0, wp: null, wt: 0, st: 0, bt: 0,
         cr: 0, ct: 0, cx: 0, cy: 0, cz: 0, ep: [],
         ng: 0, lp: 0, fn: 0, ft: 0, fp: 0, hf: 0,
@@ -376,8 +387,16 @@ export default function Game() {
       p.cr = 0; p.ep = [];
       if (iB) {
         if (p.lv <= 0) { p.fn = 1; return; }
-        const a = Math.random() * Math.PI * 2, d = 100 + Math.random() * 250;
-        p.x = Math.cos(a) * d; p.y = 200 + Math.random() * 60; p.z = Math.sin(a) * d; p.yw = Math.random() * Math.PI * 2;
+        // Safe respawn: try up to 10 positions, pick one far from all living racers
+        let bestX, bestY, bestZ;
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const a = Math.random() * Math.PI * 2, d = 100 + Math.random() * 250;
+          const tx = Math.cos(a) * d, ty = 200 + Math.random() * 60, tz = Math.sin(a) * d;
+          bestX = tx; bestY = ty; bestZ = tz;
+          const tooClose = rs.some(r => r !== p && !r.cr && !r.fn && Math.sqrt((r.x - tx) ** 2 + (r.z - tz) ** 2) < 80);
+          if (!tooClose) break;
+        }
+        p.x = bestX; p.y = bestY; p.z = bestZ; p.yw = Math.random() * Math.PI * 2;
       } else {
         const g = crs[p.ng], v = crs[(p.ng - 1 + NG) % NG];
         p.x = (g.x + v.x) / 2; p.y = (g.y + v.y) / 2 + 30; p.z = (g.z + v.z) / 2;
