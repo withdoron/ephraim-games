@@ -56,13 +56,8 @@ export default function Game() {
       crs[4].y = 80; crs[5].y = 80;
     }
 
-    // Powerup rings
-    const br = [];
-    const ringMinY = cr === 3 ? 60 : 140, ringRangeY = cr === 3 ? 60 : 160;
-    for (let i = 0; i < (iB ? 16 : 20); i++) {
-      const a = (i / (iB ? 16 : 20)) * Math.PI * 2, r = iB ? 200 + Math.random() * 350 : 300 + Math.random() * 500;
-      br.push({ x: Math.cos(a) * r + (Math.random() - 0.5) * 120, y: ringMinY + Math.random() * ringRangeY, z: Math.sin(a) * r + (Math.random() - 0.5) * 120, sz: 25, cl: 0, rt: 0 });
-    }
+    // Mystery cubes — row of 4 cubes halfway between each gate pair
+    const cubes = [];
 
     // Simple terrain
     const TS = 3500, GR = 20, tH = [];
@@ -261,38 +256,25 @@ export default function Game() {
         });
       }
     }
-    // Extra powerup rings inside the canyon (Course 0 only)
-    if (!iB && cr === 0 && crs.length > 1) {
-      for (let i = 0; i < 10; i++) {
-        const gi = 1 + Math.floor(Math.random() * 4);
-        const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
-        const t = Math.random();
-        const rx = g1.x + (g2.x - g1.x) * t + (Math.random() - 0.5) * 80;
-        const rz = g1.z + (g2.z - g1.z) * t + (Math.random() - 0.5) * 80;
-        br.push({ x: rx, y: 160 + Math.random() * 60, z: rz, sz: 25, cl: 0, rt: 0 });
+    // Generate mystery cube stations — race: 1 station per gate pair, battle: 8 stations in circle
+    if (iB) {
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2, r = 250;
+        const cx = Math.cos(a) * r, cz = Math.sin(a) * r, cy = 200;
+        const px = -Math.sin(a), pz = Math.cos(a);
+        for (const off of [-25, 0, 25]) {
+          cubes.push({ x: cx + px * off, y: cy, z: cz + pz * off, active: true, rt: 0 });
+        }
       }
-    }
-
-    // On-track powerup clusters — 6 rings between each pair of gates (2 clusters of 3)
-    if (!iB && crs.length > 1) {
+    } else if (crs.length > 1) {
       for (let i = 0; i < NG; i++) {
         const g1 = crs[i], g2 = crs[(i + 1) % NG];
+        const mx = (g1.x + g2.x) / 2, mz = (g1.z + g2.z) / 2, my = (g1.y + g2.y) / 2;
         const dx = g2.x - g1.x, dz = g2.z - g1.z;
         const len = Math.sqrt(dx * dx + dz * dz) || 1;
         const px = -dz / len, pz = dx / len;
-        // Cluster at 1/3 point
-        for (let off of [-25, 0, 25]) {
-          const t = 1/3;
-          const mx = g1.x + dx * t + px * off, mz = g1.z + dz * t + pz * off;
-          const my = g1.y + (g2.y - g1.y) * t;
-          br.push({ x: mx, y: my, z: mz, sz: 25, cl: 0, rt: 0 });
-        }
-        // Cluster at 2/3 point
-        for (let off of [-25, 0, 25]) {
-          const t = 2/3;
-          const mx = g1.x + dx * t + px * off, mz = g1.z + dz * t + pz * off;
-          const my = g1.y + (g2.y - g1.y) * t;
-          br.push({ x: mx, y: my, z: mz, sz: 25, cl: 0, rt: 0 });
+        for (const off of [-45, -15, 15, 45]) {
+          cubes.push({ x: mx + px * off, y: my, z: mz + pz * off, active: true, rt: 0 });
         }
       }
     }
@@ -363,6 +345,7 @@ export default function Game() {
       p.cr = 1; p.ct = iB ? 70 : 80; p.cx = p.x; p.cy = p.y; p.cz = p.z; p.ep = [];
       for (let i = 0; i < 10; i++) p.ep.push({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 7, vy: Math.random() * 5 + 2, vz: (Math.random() - 0.5) * 7, s: 5 + Math.random() * 8, l: 25 + Math.random() * 30, ml: 55, t: 0 });
       for (let i = 0; i < 4; i++) p.ep.push({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 2, vy: Math.random() * 1.5, vz: (Math.random() - 0.5) * 2, s: 7 + Math.random() * 10, l: 30 + Math.random() * 20, ml: 50, t: 1 });
+      for (let i = 0; i < 6; i++) p.ep.push({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 14, vy: Math.random() * 8 + 3, vz: (Math.random() - 0.5) * 14, s: 2 + Math.random() * 2, l: 10 + Math.random() * 10, ml: 20, t: 2 });
       if (iB) p.lv--;
     }
 
@@ -401,13 +384,15 @@ export default function Game() {
       return 0;
     }
 
-    function getRings(r) {
-      br.forEach(b => {
-        if (b.cl) return;
-        if (Math.sqrt((r.x - b.x) ** 2 + (r.y - b.y) ** 2 + (r.z - b.z) ** 2) < b.sz + 12) {
-          b.cl = 1; b.rt = iB ? 200 : 300;
-          const pw = PW[Math.floor(Math.random() * PW.length)];
-          r.wp = pw.id; r.wt = pw.id === "gun" ? 8 : 0;
+    function getCubes(r) {
+      cubes.forEach(c => {
+        if (!c.active) return;
+        if (Math.sqrt((r.x - c.x) ** 2 + (r.y - c.y) ** 2 + (r.z - c.z) ** 2) < 20) {
+          c.active = false; c.rt = 300;
+          if (r.wp === null) {
+            const pw = PW[Math.floor(Math.random() * PW.length)];
+            r.wp = pw.id; r.wt = pw.id === "gun" ? 8 : 0;
+          }
         }
       });
     }
@@ -472,7 +457,7 @@ export default function Game() {
 
       if (checkCol(r)) return;
       checkGate(r);
-      getRings(r);
+      getCubes(r);
     }
 
     function updatePlayer(r, c, ks, uK, dK, lK, rK, upK, dvK, fK) {
@@ -523,7 +508,7 @@ export default function Game() {
 
       if (checkCol(r)) return;
       checkGate(r);
-      getRings(r);
+      getCubes(r);
 
       const cD = 50 + r.sp * 2, cH = 10 + r.sp * 0.5;
       c.x += (r.x - sy * cD - c.x) * dt * 5;
@@ -559,22 +544,38 @@ export default function Game() {
       sg.addColorStop(0.85, "#87CEEB"); sg.addColorStop(1, "#d4a060");
       x.fillStyle = sg; x.fillRect(0, 0, W, vh);
 
-      const rn = [];
-      const stp = TS / GR, vD = 550;
+      // Sun glow
+      const sunX = W * 0.75, sunY = vh * 0.15;
+      const sunG = x.createRadialGradient(sunX, sunY, 0, sunX, sunY, 80);
+      sunG.addColorStop(0, "rgba(255,240,200,0.25)"); sunG.addColorStop(0.5, "rgba(255,220,180,0.1)"); sunG.addColorStop(1, "rgba(255,200,150,0)");
+      x.fillStyle = sunG; x.fillRect(sunX - 80, sunY - 80, 160, 160);
 
-      // Terrain
-      for (let i = 0; i < GR; i += 2) {
-        for (let j = 0; j < GR; j += 2) {
+      const rn = [];
+      const stp = TS / GR, vD = 900;
+      let shakeX = 0, shakeY = 0;
+      if (vw.cr && vw.ct > (iB ? 55 : 65)) { shakeX = (Math.random() - 0.5) * 8; shakeY = (Math.random() - 0.5) * 8; }
+
+      // Terrain — full detail within 300, skip-every-other beyond
+      for (let step = 1; step <= 2; step++) {
+        const skip = step === 1 ? 1 : 2;
+        for (let i = 0; i < GR; i += skip) {
+          for (let j = 0; j < GR; j += skip) {
           const wx = -TS / 2 + i * stp, wz = -TS / 2 + j * stp;
           const dist = Math.sqrt((wx + stp - vw.x) ** 2 + (wz + stp - vw.z) ** 2);
+          if (step === 1 && dist > 300) continue;
+          if (step === 2 && dist <= 300) continue;
           if (dist > vD) continue;
-          const s2 = stp * 2;
+          const si = skip, s2 = stp * si;
+          const ni = Math.min(i + si, GR), nj = Math.min(j + si, GR);
           const p00 = proj(wx, tH[i][j], wz, cam, vh);
-          const p10 = proj(wx + s2, tH[Math.min(i + 2, GR)]?.[j] ?? tH[i][j], wz, cam, vh);
-          const p01 = proj(wx, tH[i]?.[Math.min(j + 2, GR)] ?? tH[i][j], wz + s2, cam, vh);
-          const p11 = proj(wx + s2, tH[Math.min(i + 2, GR)]?.[Math.min(j + 2, GR)] ?? tH[i][j], wz + s2, cam, vh);
+          const p10 = proj(wx + s2, tH[ni]?.[j] ?? tH[i][j], wz, cam, vh);
+          const p01 = proj(wx, tH[i]?.[nj] ?? tH[i][j], wz + s2, cam, vh);
+          const p11 = proj(wx + s2, tH[ni]?.[nj] ?? tH[i][j], wz + s2, cam, vh);
           if (!p00 && !p10 && !p01 && !p11) continue;
           const h = tH[i][j];
+          // Terrain normal shading — compare with neighbor to right
+          const hR = tH[ni]?.[j] ?? h;
+          const nShade = Math.max(0.7, Math.min(1.1, 1 + (h - hR) * 0.008));
           let r, g, b;
           if (cr === 3) {
             // Ocean course — water colors
@@ -600,9 +601,9 @@ export default function Game() {
             if (bi >= bands.length - 1) { r = bands[bands.length-1][1]; g = bands[bands.length-1][2]; b = bands[bands.length-1][3]; }
             else { const lo = bands[bi], hi = bands[bi+1]; const t = Math.max(0, Math.min(1, (h - lo[0]) / (hi[0] - lo[0]))); r = lo[1] + (hi[1] - lo[1]) * t; g = lo[2] + (hi[2] - lo[2]) * t; b = lo[3] + (hi[3] - lo[3]) * t; }
           }
-          const sh = Math.max(0.3, 1 - dist / vD);
+          const sh = Math.max(0.3, 1 - dist / vD) * nShade;
           rn.push({ d: ((p00?.d || 9999) + (p10?.d || 9999)) / 2, f() {
-            x.fillStyle = `rgba(${r * sh | 0},${g * sh | 0},${b * sh | 0},${sh})`;
+            x.fillStyle = `rgba(${Math.min(255, r * sh) | 0},${Math.min(255, g * sh) | 0},${Math.min(255, b * sh) | 0},${Math.max(0.3, 1 - dist / vD)})`;
             x.beginPath();
             if (p00) x.moveTo(p00.sx, p00.sy); else if (p10) x.moveTo(p10.sx, p10.sy);
             if (p10) x.lineTo(p10.sx, p10.sy);
@@ -611,13 +612,14 @@ export default function Game() {
             x.closePath(); x.fill();
           }});
         }
+        }
       }
 
       // Mountains
       mts.forEach(m => {
         const dist = Math.sqrt((m.x - vw.x) ** 2 + (m.z - vw.z) ** 2);
-        if (dist > 1000) return;
-        const al = Math.max(0.3, 1 - dist / 1000);
+        if (dist > 1800) return;
+        const al = Math.max(0.3, 1 - dist / 1800);
         const pP = proj(m.x, m.bY + m.ht, m.z, cam, vh);
         const pL = proj(m.x - m.w, m.bY, m.z, cam, vh);
         const pR = proj(m.x + m.w, m.bY, m.z, cam, vh);
@@ -634,8 +636,10 @@ export default function Game() {
               x.fillStyle = `rgb(${70 * sh + 30 | 0},${60 * sh + 25 | 0},${50 * sh + 20 | 0})`;
             }
             x.beginPath(); x.moveTo(a.sx, a.sy); x.lineTo(pP.sx, pP.sy); x.lineTo(b.sx, b.sy); x.closePath(); x.fill();
+            // Edge stroke for definition
+            x.strokeStyle = "rgba(0,0,0,0.12)"; x.lineWidth = 0.5;
+            x.beginPath(); x.moveTo(a.sx, a.sy); x.lineTo(pP.sx, pP.sy); x.lineTo(b.sx, b.sy); x.closePath(); x.stroke();
             if (!m.volcanic) {
-              // Snow (non-volcanic only)
               x.fillStyle = `rgb(${200 * sh + 40 | 0},${200 * sh + 40 | 0},${210 * sh + 30 | 0})`;
               const sY = m.bY + m.ht * 0.7;
               const sA = proj((a.sx === pL?.sx ? m.x - m.w / 2 : a.sx === pF?.sx ? m.x : a.sx === pR?.sx ? m.x + m.w / 2 : m.x), sY, (a.sx === pL?.sx ? m.z : a.sx === pF?.sx ? m.z - m.w / 2 : a.sx === pR?.sx ? m.z : m.z + m.w / 2), cam, vh);
@@ -648,8 +652,8 @@ export default function Game() {
       // Floating islands (Course 1) — solid connected 3D shapes
       islands.forEach(il => {
         const dist = Math.sqrt((il.x - vw.x) ** 2 + (il.z - vw.z) ** 2);
-        if (dist > 600) return;
-        const al = Math.max(0.3, 1 - dist / 600);
+        if (dist > 1000) return;
+        const al = Math.max(0.3, 1 - dist / 1000);
         // Three projected points: top-left, top-right, bottom-center
         const pTL = proj(il.x - il.w / 2, il.y + il.h / 2, il.z, cam, vh);
         const pTR = proj(il.x + il.w / 2, il.y + il.h / 2, il.z, cam, vh);
@@ -693,10 +697,10 @@ export default function Game() {
       // Pirate ships (Ocean Run scenery)
       ships.forEach(sh => {
         const dist = Math.sqrt((sh.x - vw.x) ** 2 + (sh.z - vw.z) ** 2);
-        if (dist > 500) return;
+        if (dist > 800) return;
         const bobY = sh.y + Math.sin(fc * 0.015 + sh.phase) * 2;
         const p = proj(sh.x, bobY, sh.z, cam, vh);
-        if (!p || p.d > 400) return;
+        if (!p || p.d > 800) return;
         const sc2 = p.sc;
         rn.push({ d: p.d, f() {
           x.save(); x.translate(p.sx, p.sy);
@@ -724,8 +728,8 @@ export default function Game() {
       arches.forEach(ar => {
         const midX = (ar.lx + ar.rx) / 2, midZ = (ar.lz + ar.rz) / 2;
         const dist = Math.sqrt((midX - vw.x) ** 2 + (midZ - vw.z) ** 2);
-        if (dist > 500) return;
-        const al = Math.max(0.3, 1 - dist / 500);
+        if (dist > 800) return;
+        const al = Math.max(0.3, 1 - dist / 800);
         // Left pillar
         const pLB = proj(ar.lx, ar.y, ar.lz, cam, vh);
         const pLT = proj(ar.lx, ar.y + ar.ht, ar.lz, cam, vh);
@@ -798,8 +802,8 @@ export default function Game() {
           const a = side[i], b = side[i + 1];
           const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
           const dist = Math.sqrt((mx - vw.x) ** 2 + (mz - vw.z) ** 2);
-          if (dist > 600) continue;
-          const al = Math.max(0.25, 1 - dist / 600);
+          if (dist > 1000) continue;
+          const al = Math.max(0.25, 1 - dist / 1000);
           const minB = Math.min(a.bY, b.bY), maxT = Math.max(a.bY + a.ht, b.bY + b.ht);
           const totalH = maxT - minB;
           // Front face — layered rock with per-segment color variation
@@ -842,10 +846,14 @@ export default function Game() {
       if (!iB) crs.forEach((ring, idx) => {
         const p = proj(ring.x, ring.y, ring.z, cam, vh);
         if (!p || p.d > 800) return;
-        const s = ring.sz * p.sc;
-        if (s < 2) return;
         const isN = idx === vw.ng;
+        const isPassed = idx < vw.ng || (vw.lp > 0 && idx >= vw.ng);
+        const pulse = isN ? 1 + Math.sin(fc * 0.08) * 0.1 : 1;
+        const s = ring.sz * p.sc * pulse;
+        if (s < 2) return;
         rn.push({ d: p.d, f() {
+          const gateAl = isPassed && !isN ? 0.05 : 1;
+          x.globalAlpha = gateAl;
           // Outer thick glow stroke
           x.strokeStyle = isN ? "rgba(50,255,50,0.3)" : "rgba(255,200,50,0.06)";
           x.lineWidth = isN ? Math.max(6, s * 0.25) : Math.max(2, s * 0.1);
@@ -855,7 +863,14 @@ export default function Game() {
           x.lineWidth = isN ? Math.max(2, s * 0.08) : Math.max(1, s * 0.04);
           if (isN) { x.shadowColor = "rgba(50,255,50,0.6)"; x.shadowBlur = 12; }
           x.beginPath(); x.ellipse(p.sx, p.sy, s, s * 0.35, 0, 0, Math.PI * 2); x.stroke();
+          // Second inner ring for next gate
+          if (isN) {
+            const s2 = s * 0.7;
+            x.strokeStyle = "rgba(100,255,100,0.5)"; x.lineWidth = Math.max(1, s2 * 0.06);
+            x.beginPath(); x.ellipse(p.sx, p.sy, s2, s2 * 0.35, 0, 0, Math.PI * 2); x.stroke();
+          }
           x.shadowBlur = 0;
+          x.globalAlpha = 1;
         }});
       });
 
@@ -877,17 +892,36 @@ export default function Game() {
         }
       }
 
-      // Bonus rings
-      br.forEach(b => {
-        if (b.cl) return;
-        const p = proj(b.x, b.y, b.z, cam, vh);
+      // Mystery cubes
+      cubes.forEach(c => {
+        const p = proj(c.x, c.y, c.z, cam, vh);
         if (!p || p.d > 600) return;
-        const s = b.sz * p.sc;
-        if (s < 2) return;
+        const s = 12 * p.sc;
+        if (s < 1.5) return;
         rn.push({ d: p.d, f() {
-          x.strokeStyle = `rgba(255,150,255,${Math.min(0.6, 50 / p.d)})`;
-          x.lineWidth = Math.max(1, s * 0.07);
-          x.beginPath(); x.ellipse(p.sx, p.sy, s * 0.7, s * 0.25, 0, 0, Math.PI * 2); x.stroke();
+          x.save(); x.translate(p.sx, p.sy);
+          const spin = Math.sin(fc * 0.03 + c.x) * 0.2;
+          x.rotate(Math.PI / 4 + spin);
+          if (c.active) {
+            // Golden box
+            x.shadowColor = "rgba(255,200,50,0.5)"; x.shadowBlur = 8;
+            x.fillStyle = "rgb(250,190,50)";
+            x.fillRect(-s, -s, s * 2, s * 2);
+            x.shadowBlur = 0;
+            // Darker edges
+            x.strokeStyle = "rgb(200,150,30)"; x.lineWidth = Math.max(1, s * 0.12);
+            x.strokeRect(-s, -s, s * 2, s * 2);
+            // Question mark
+            x.rotate(-(Math.PI / 4 + spin));
+            x.fillStyle = "#fff"; x.font = `bold ${Math.max(6, s * 1.2) | 0}px Georgia`;
+            x.textAlign = "center"; x.textBaseline = "middle";
+            x.fillText("?", 0, 0);
+          } else {
+            // Ghost outline for inactive
+            x.strokeStyle = "rgba(255,200,50,0.12)"; x.lineWidth = 1;
+            x.strokeRect(-s, -s, s * 2, s * 2);
+          }
+          x.restore();
         }});
       });
 
@@ -895,7 +929,7 @@ export default function Game() {
       rs.forEach(r => {
         if (r === vw || r.cr || r.fn) return;
         const p = proj(r.x, r.y, r.z, cam, vh);
-        if (!p || p.d > 400 || p.d < 5) return;
+        if (!p || p.d > 700 || p.d < 5) return;
         const s = Math.max(3, 11 * p.sc);
         rn.push({ d: p.d, f() {
           x.save(); x.translate(p.sx, p.sy); x.rotate(-r.rl);
@@ -935,20 +969,37 @@ export default function Game() {
           if (s < 1) return;
           const lf = ep.l / ep.ml;
           rn.push({ d: p.d, f() {
-            x.fillStyle = ep.t === 0 ? `rgba(255,${100 + lf * 155 | 0},${lf * 50 | 0},${lf * 0.8})` : `rgba(60,60,60,${lf * 0.3})`;
+            x.fillStyle = ep.t === 2 ? `rgba(255,255,255,${lf * 0.9})` : ep.t === 0 ? `rgba(255,${100 + lf * 155 | 0},${lf * 50 | 0},${lf * 0.8})` : `rgba(60,60,60,${lf * 0.3})`;
             x.beginPath(); x.arc(p.sx, p.sy, s, 0, Math.PI * 2); x.fill();
           }});
         });
       });
 
+      // Shadow under player plane
+      if (!vw.cr && !vw.fn) {
+        const shY = gH(vw.x, vw.z);
+        const shP = proj(vw.x, shY, vw.z, cam, vh);
+        if (shP) {
+          const alt = Math.max(1, vw.y - shY);
+          const shSz = Math.max(3, 20 / (1 + alt * 0.01)) * shP.sc;
+          rn.push({ d: shP.d, f() {
+            x.fillStyle = "rgba(0,0,0,0.15)";
+            x.beginPath(); x.ellipse(shP.sx, shP.sy, shSz * 1.5, shSz * 0.5, 0, 0, Math.PI * 2); x.fill();
+          }});
+        }
+      }
+
       // Sort and draw
       rn.sort((a, b) => b.d - a.d);
       rn.forEach(r => r.f());
 
-      // Distance fog overlay
-      const fogG = x.createLinearGradient(0, vh * 0.3, 0, vh);
-      fogG.addColorStop(0, "rgba(140,180,210,0)"); fogG.addColorStop(0.5, "rgba(140,180,210,0.08)"); fogG.addColorStop(1, "rgba(140,180,210,0.2)");
+      // Distance fog overlay — smooth horizon fade
+      const fogG = x.createRadialGradient(W / 2, vh * 0.6, vh * 0.15, W / 2, vh * 0.4, vh * 0.9);
+      fogG.addColorStop(0, "rgba(180,200,220,0)"); fogG.addColorStop(0.6, "rgba(180,200,220,0.08)"); fogG.addColorStop(1, "rgba(180,200,220,0.35)");
       x.fillStyle = fogG; x.fillRect(0, 0, W, vh);
+
+      // Screen shake offset
+      if (shakeX || shakeY) { x.translate(shakeX, shakeY); }
 
       // Own plane — angular sci-fi fighter
       if (!vw.cr && !vw.fn) {
@@ -1023,6 +1074,22 @@ export default function Game() {
         x.fillText(txt, W / 2, vh / 2); x.textAlign = "start";
       }
 
+      // Speed lines — streaks from edges toward center when fast
+      if (!vw.cr && !vw.fn && vw.sp > 4) {
+        const sla = Math.min(0.4, (vw.sp - 4) / 6 * 0.4);
+        x.strokeStyle = `rgba(255,255,255,${sla})`; x.lineWidth = 1;
+        for (let i = 0; i < 6; i++) {
+          const angle = (i / 6) * Math.PI * 2 + fc * 0.02;
+          const r1 = vh * 0.45, r2 = r1 - 30 - Math.random() * 20;
+          const sx2 = W / 2 + Math.cos(angle) * r1, sy2 = vh / 2 + Math.sin(angle) * r1;
+          const ex = W / 2 + Math.cos(angle) * r2, ey = vh / 2 + Math.sin(angle) * r2;
+          x.beginPath(); x.moveTo(sx2, sy2); x.lineTo(ex, ey); x.stroke();
+        }
+      }
+
+      // Undo screen shake
+      if (shakeX || shakeY) { x.translate(-shakeX, -shakeY); }
+
       // HUD
       if (!iB) {
         x.font = "bold 10px Georgia"; x.textAlign = "right"; x.fillStyle = "#fbbf24";
@@ -1082,7 +1149,7 @@ export default function Game() {
       pj.forEach(p => { p.x += p.vx; p.y += p.vy; p.z += p.vz; p.l--; });
       rs.forEach(pl => { if (pl.cr || pl.fn) return; pj.forEach(pr => { if (pr.o === pl) return; if (Math.sqrt((pl.x - pr.x) ** 2 + (pl.y - pr.y) ** 2 + (pl.z - pr.z) ** 2) < 15) { boomFrom(pl, pr.o); pr.l = 0; } }); });
       pj = pj.filter(p => p.l > 0);
-      br.forEach(r => { if (r.cl) { r.rt--; if (r.rt <= 0) r.cl = 0; } });
+      cubes.forEach(c => { if (!c.active) { c.rt--; if (c.rt <= 0) c.active = true; } });
 
       // End conditions
       if (iB) {
