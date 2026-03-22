@@ -187,11 +187,11 @@ export default function Game() {
         const dx = g2.x - g.x, dz = g2.z - g.z;
         const len = Math.sqrt(dx * dx + dz * dz) || 1;
         const px = -dz / len, pz = dx / len;
-        const spread = 80 + Math.random() * 20;
+        const spread = 60 + Math.random() * 15;
         arches.push({
           lx: g.x + px * spread, lz: g.z + pz * spread,
           rx: g.x - px * spread, rz: g.z - pz * spread,
-          y: -25, ht: 100 + Math.random() * 40, w: 35
+          y: -25, ht: 60 + Math.random() * 20, w: 18 + Math.random() * 6
         });
       });
     }
@@ -302,7 +302,7 @@ export default function Game() {
         // Volcano: near volcano base
         sx2 = 200; sy2 = 120; sz2 = 200;
       }
-      stormCubes.push({ x: sx2, y: sy2, z: sz2, active: true, rt: 0 });
+      stormCubes.push({ x: sx2, y: sy2, z: sz2, active: true, rt: 0, noRespawn: true });
     }
 
     // Flight path safety cleanup — remove terrain objects too close to gates or the path between them
@@ -409,10 +409,10 @@ export default function Game() {
       for (const ar of arches) {
         // Left pillar collision
         const dL = Math.sqrt((r.x - ar.lx) ** 2 + (r.z - ar.lz) ** 2);
-        if (dL < 20 && r.y > ar.y && r.y < ar.y + ar.ht) { boom(r); return 1; }
+        if (dL < 15 && r.y > ar.y && r.y < ar.y + ar.ht) { boom(r); return 1; }
         // Right pillar collision
         const dR = Math.sqrt((r.x - ar.rx) ** 2 + (r.z - ar.rz) ** 2);
-        if (dR < 20 && r.y > ar.y && r.y < ar.y + ar.ht) { boom(r); return 1; }
+        if (dR < 15 && r.y > ar.y && r.y < ar.y + ar.ht) { boom(r); return 1; }
       }
       if (r.y > 600) r.y = 600;
       return 0;
@@ -832,7 +832,7 @@ export default function Game() {
         }});
       });
 
-      // Rock arches (Ocean Run) — thick layered rock pillars + beam
+      // Rock arches (Ocean Run) — smooth tapered pillars + curved beam
       arches.forEach(ar => {
         const midX = (ar.lx + ar.rx) / 2, midZ = (ar.lz + ar.rz) / 2;
         const dist = Math.sqrt((midX - vw.x) ** 2 + (midZ - vw.z) ** 2);
@@ -846,49 +846,57 @@ export default function Game() {
         const avgD = (pLB.d + pRB.d) / 2;
         rn.push({ d: avgD, f() {
           x.globalAlpha = al;
-          const lw = Math.max(8, ar.w * pLB.sc);
-          const rw2 = Math.max(8, ar.w * pRB.sc);
-          // Layered rock pillars — 3 color bands
-          const bands = [["rgb(90,55,35)", 0, 0.33], ["rgb(160,75,40)", 0.33, 0.66], ["rgb(200,130,70)", 0.66, 1]];
-          bands.forEach(([col, t0, t1]) => {
-            // Left pillar band
+          const lwB = Math.max(6, ar.w * pLB.sc); // base width
+          const lwT = lwB * 0.6; // top width (tapered)
+          const rwB = Math.max(6, ar.w * pRB.sc);
+          const rwT = rwB * 0.6;
+          // Smooth gradient pillars — tapered trapezoids with blended color
+          const nSegs = 6;
+          for (let si = 0; si < nSegs; si++) {
+            const t0 = si / nSegs, t1 = (si + 1) / nSegs;
+            // Interpolate color: dark brown at bottom to sandy at top
+            const r0 = 80 + (180 - 80) * t0, g0 = 50 + (130 - 50) * t0, b0 = 30 + (75 - 30) * t0;
+            x.fillStyle = `rgb(${r0|0},${g0|0},${b0|0})`;
+            // Left pillar segment (tapered)
             const lyB = pLB.sy + (pLT.sy - pLB.sy) * t0;
             const lyT = pLB.sy + (pLT.sy - pLB.sy) * t1;
-            x.fillStyle = col;
-            x.fillRect(pLB.sx - lw / 2, Math.min(lyB, lyT), lw, Math.abs(lyT - lyB) || 1);
-            // Right pillar band
+            const lwS0 = lwB + (lwT - lwB) * t0, lwS1 = lwB + (lwT - lwB) * t1;
+            const lCx = pLB.sx + (pLT.sx - pLB.sx) * ((t0 + t1) / 2);
+            x.beginPath();
+            x.moveTo(lCx - lwS0 / 2, lyB); x.lineTo(lCx + lwS0 / 2, lyB);
+            x.lineTo(lCx + lwS1 / 2, lyT); x.lineTo(lCx - lwS1 / 2, lyT);
+            x.closePath(); x.fill();
+            // Right pillar segment (tapered)
             const ryB = pRB.sy + (pRT.sy - pRB.sy) * t0;
             const ryT = pRB.sy + (pRT.sy - pRB.sy) * t1;
-            x.fillRect(pRB.sx - rw2 / 2, Math.min(ryB, ryT), rw2, Math.abs(ryT - ryB) || 1);
-          });
-          // Thick connecting beam — 18 units thick
-          const beamH = Math.max(6, 18 * ((pLT.sc + pRT.sc) / 2));
-          const cpY = Math.min(pLT.sy, pRT.sy) - beamH * 0.8;
-          // Bottom edge of beam
-          x.fillStyle = "rgb(160,75,40)";
+            const rwS0 = rwB + (rwT - rwB) * t0, rwS1 = rwB + (rwT - rwB) * t1;
+            const rCx = pRB.sx + (pRT.sx - pRB.sx) * ((t0 + t1) / 2);
+            x.beginPath();
+            x.moveTo(rCx - rwS0 / 2, ryB); x.lineTo(rCx + rwS0 / 2, ryB);
+            x.lineTo(rCx + rwS1 / 2, ryT); x.lineTo(rCx - rwS1 / 2, ryT);
+            x.closePath(); x.fill();
+          }
+          // Curved connecting beam — 10 units thick
+          const beamH = Math.max(4, 10 * ((pLT.sc + pRT.sc) / 2));
+          const midSx = (pLT.sx + pRT.sx) / 2;
+          const midSy = Math.min(pLT.sy, pRT.sy);
+          const cpYTop = midSy - beamH * 1.5; // arch curve upward
+          const cpYBot = midSy + beamH * 0.3;
+          // Fill beam body
+          x.fillStyle = "rgb(140,85,45)";
           x.beginPath();
-          x.moveTo(pLT.sx - lw / 2, pLT.sy);
-          x.lineTo(pLT.sx + lw / 2, pLT.sy);
-          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY + beamH, pRT.sx - rw2 / 2, pRT.sy);
-          x.lineTo(pRT.sx + rw2 / 2, pRT.sy);
-          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY + beamH * 0.5, pLT.sx - lw / 2, pLT.sy);
+          x.moveTo(pLT.sx, pLT.sy);
+          x.quadraticCurveTo(midSx, cpYBot, pRT.sx, pRT.sy);
+          x.lineTo(pRT.sx, pRT.sy - beamH);
+          x.quadraticCurveTo(midSx, cpYTop, pLT.sx, pLT.sy - beamH);
           x.closePath(); x.fill();
-          // Top edge of beam
-          x.fillStyle = "rgb(200,130,70)";
+          // Top highlight
+          x.fillStyle = "rgb(180,130,75)";
           x.beginPath();
-          x.moveTo(pLT.sx - lw / 2, pLT.sy - beamH);
-          x.lineTo(pLT.sx + lw / 2, pLT.sy - beamH);
-          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY, pRT.sx - rw2 / 2, pRT.sy - beamH);
-          x.lineTo(pRT.sx + rw2 / 2, pRT.sy - beamH);
-          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY - beamH * 0.3, pLT.sx - lw / 2, pLT.sy - beamH);
-          x.closePath(); x.fill();
-          // Fill between top and bottom edges
-          x.fillStyle = "rgb(130,65,35)";
-          x.beginPath();
-          x.moveTo(pLT.sx + lw / 2, pLT.sy - beamH);
-          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY, pRT.sx - rw2 / 2, pRT.sy - beamH);
-          x.lineTo(pRT.sx - rw2 / 2, pRT.sy);
-          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY + beamH, pLT.sx + lw / 2, pLT.sy);
+          x.moveTo(pLT.sx, pLT.sy - beamH);
+          x.quadraticCurveTo(midSx, cpYTop, pRT.sx, pRT.sy - beamH);
+          x.lineTo(pRT.sx, pRT.sy - beamH * 1.3);
+          x.quadraticCurveTo(midSx, cpYTop - beamH * 0.3, pLT.sx, pLT.sy - beamH * 1.3);
           x.closePath(); x.fill();
           x.globalAlpha = 1;
         }});
@@ -1060,30 +1068,28 @@ export default function Game() {
         }});
       });
 
-      // Special storm cubes — purple electric cubes
+      // Special storm cubes — disguised as regular golden cubes
       stormCubes.forEach(c => {
+        if (!c.active) return;
         const p = proj(c.x, c.y, c.z, cam, vh);
         if (!p || p.d > 600) return;
-        const s = 14 * p.sc;
+        const s = 12 * p.sc;
         if (s < 1.5) return;
         rn.push({ d: p.d, f() {
           x.save(); x.translate(p.sx, p.sy);
-          const spin = Math.sin(fc * 0.04 + c.x) * 0.25;
+          const spin = Math.sin(fc * 0.03 + c.x) * 0.2;
           x.rotate(Math.PI / 4 + spin);
           if (c.active) {
-            x.shadowColor = "rgba(168,85,247,0.6)"; x.shadowBlur = 10;
-            x.fillStyle = "rgb(140,80,220)";
+            x.shadowColor = "rgba(255,200,50,0.5)"; x.shadowBlur = 8;
+            x.fillStyle = "rgb(250,190,50)";
             x.fillRect(-s, -s, s * 2, s * 2);
             x.shadowBlur = 0;
-            x.strokeStyle = "rgb(100,50,180)"; x.lineWidth = Math.max(1, s * 0.12);
+            x.strokeStyle = "rgb(200,150,30)"; x.lineWidth = Math.max(1, s * 0.12);
             x.strokeRect(-s, -s, s * 2, s * 2);
             x.rotate(-(Math.PI / 4 + spin));
-            x.fillStyle = "#fff"; x.font = `bold ${Math.max(7, s * 1.3) | 0}px Georgia`;
+            x.fillStyle = "#fff"; x.font = `bold ${Math.max(6, s * 1.2) | 0}px Georgia`;
             x.textAlign = "center"; x.textBaseline = "middle";
-            x.fillText("⚡", 0, 0);
-          } else {
-            x.strokeStyle = "rgba(168,85,247,0.12)"; x.lineWidth = 1;
-            x.strokeRect(-s, -s, s * 2, s * 2);
+            x.fillText("?", 0, 0);
           }
           x.restore();
         }});
@@ -1345,7 +1351,7 @@ export default function Game() {
       rs.forEach(pl => { if (pl.cr || pl.fn) return; pj.forEach(pr => { if (pr.o === pl) return; if (Math.sqrt((pl.x - pr.x) ** 2 + (pl.y - pr.y) ** 2 + (pl.z - pr.z) ** 2) < 15) { boomFrom(pl, pr.o); pr.l = 0; } }); });
       pj = pj.filter(p => p.l > 0);
       cubes.forEach(c => { if (!c.active) { c.rt--; if (c.rt <= 0) c.active = true; } });
-      stormCubes.forEach(c => { if (!c.active) { c.rt--; if (c.rt <= 0) c.active = true; } });
+      stormCubes.forEach(c => { if (!c.active && !c.noRespawn) { c.rt--; if (c.rt <= 0) c.active = true; } });
 
       // Lightning storms — update timers, zap nearby racers
       storms.forEach(st => {
