@@ -229,9 +229,10 @@ export default function Game() {
       }
     }
 
-    // Ice Cavern — tunnels, icicles, and ice pillars (Course 5)
+    // Ice Cavern — tunnels inside mountains, big icicles, ice pillars (Course 5)
     const tunnels = [];
     const icicles = [];
+    const tunnelMts = []; // mountains that contain tunnels — skip collision when racer is at tunnel altitude
     if (!iB && cr === 5 && crs.length > 1) {
       // 3 tunnel segments: gates 1-2, 3-4, 5-0
       [[1,2],[3,4],[5,0]].forEach(([ga, gb]) => {
@@ -253,14 +254,27 @@ export default function Game() {
           });
         }
         tunnels.push(sections);
-        // Icicles hanging from ceiling
-        for (let ic = 0; ic < 4; ic++) {
+        // Tunnel mountain — placed at midpoint of the tunnel
+        const midSec = sections[Math.floor(sections.length / 2)];
+        const tmW = 120 + Math.random() * 30;
+        const tmHt = 160 + Math.random() * 40;
+        const tm = { x: midSec.cx, z: midSec.cz, bY: gH(midSec.cx, midSec.cz), ht: tmHt, w: tmW, icy: 1, tunnelMt: true, tunnelBaseY: midSec.baseY, tunnelTopY: midSec.ceilY };
+        mts.push(tm);
+        tunnelMts.push(tm);
+        // Entrance/exit positions for dark opening rendering
+        const entSec = sections[0], exSec = sections[sections.length - 1];
+        tm.entrances = [
+          { x: entSec.cx, y: (entSec.baseY + entSec.ceilY) / 2, z: entSec.cz, rH: (entSec.ceilY - entSec.baseY) / 2, rW: 55 },
+          { x: exSec.cx, y: (exSec.baseY + exSec.ceilY) / 2, z: exSec.cz, rH: (exSec.ceilY - exSec.baseY) / 2, rW: 55 }
+        ];
+        // Big icicles hanging from ceiling — 5 per tunnel
+        for (let ic = 0; ic < 5; ic++) {
           const si = 1 + Math.floor(Math.random() * 4);
           const sec = sections[si];
           const perpT = (Math.random() - 0.5) * 0.8;
           const ix = (sec.lx + sec.rx) / 2 + (sec.lx - sec.rx) * perpT;
           const iz = (sec.lz + sec.rz) / 2 + (sec.lz - sec.rz) * perpT;
-          icicles.push({ x: ix, z: iz, topY: sec.ceilY, len: 15 + Math.random() * 15, w: 3 + Math.random() * 2 });
+          icicles.push({ x: ix, z: iz, topY: sec.ceilY, len: 35 + Math.random() * 25, w: 8 + Math.random() * 6 });
         }
       });
       // Ice pillars outside tunnels
@@ -490,6 +504,7 @@ export default function Game() {
     function checkCol(r) {
       if (r.y < gH(r.x, r.z) + 8) { boom(r); return 1; }
       for (const m of mts) {
+        if (m.tunnelMt && r.y >= m.tunnelBaseY - 5 && r.y <= m.tunnelTopY + 5) continue;
         const d = Math.sqrt((r.x - m.x) ** 2 + (r.z - m.z) ** 2);
         const hf = Math.max(0, Math.min(1, (r.y - m.bY) / m.ht));
         if (d < m.w * 0.8 * (1 - hf * 0.7) + 10 && r.y < m.bY + m.ht && r.y > m.bY) { boom(r); return 1; }
@@ -542,7 +557,7 @@ export default function Game() {
       // Icicle collision
       for (const ic of icicles) {
         const d = Math.sqrt((r.x - ic.x) ** 2 + (r.z - ic.z) ** 2);
-        if (d < 5 && r.y > ic.topY - ic.len && r.y < ic.topY) { boom(r); return 1; }
+        if (d < 10 && r.y > ic.topY - ic.len && r.y < ic.topY) { boom(r); return 1; }
       }
       if (r.y > 600) r.y = 600;
       return 0;
@@ -1213,11 +1228,43 @@ export default function Game() {
           const pB = proj(ic.x, ic.topY - ic.len, ic.z, cam, vh);
           if (!pT || !pB) return;
           rn.push({ d: pT.d, f() {
-            const w2 = Math.max(1, ic.w * pT.sc);
-            x.fillStyle = "rgba(160,200,230,0.8)";
-            x.beginPath(); x.moveTo(pT.sx - w2, pT.sy); x.lineTo(pT.sx + w2, pT.sy);
-            x.lineTo(pB.sx, pB.sy); x.closePath(); x.fill();
+            const wTop = Math.max(2, ic.w * pT.sc);
+            const wBot = Math.max(0.5, ic.w * 0.15 * pB.sc);
+            x.save();
+            x.shadowColor = "rgba(180,220,255,0.6)";
+            x.shadowBlur = 4;
+            x.fillStyle = "rgba(180,215,240,0.85)";
+            x.beginPath(); x.moveTo(pT.sx - wTop, pT.sy); x.lineTo(pT.sx + wTop, pT.sy);
+            x.lineTo(pB.sx + wBot, pB.sy); x.lineTo(pB.sx - wBot, pB.sy); x.closePath(); x.fill();
+            x.shadowBlur = 0;
+            // White highlight streak
+            x.strokeStyle = "rgba(255,255,255,0.5)";
+            x.lineWidth = Math.max(1, wTop * 0.3);
+            x.beginPath(); x.moveTo(pT.sx - wTop * 0.3, pT.sy + 2); x.lineTo(pB.sx, pB.sy - 2); x.stroke();
+            x.restore();
           }});
+        });
+        // Tunnel entrance dark openings on mountain faces
+        tunnelMts.forEach(tm => {
+          if (!tm.entrances) return;
+          tm.entrances.forEach(en => {
+            const dist = Math.sqrt((en.x - vw.x) ** 2 + (en.z - vw.z) ** 2);
+            if (dist > 500) return;
+            const p = proj(en.x, en.y, en.z, cam, vh);
+            if (!p) return;
+            rn.push({ d: p.d - 0.5, f() {
+              const rW = Math.max(3, en.rW * p.sc);
+              const rH = Math.max(2, en.rH * p.sc);
+              x.save();
+              x.fillStyle = "rgba(15,20,35,0.9)";
+              x.beginPath(); x.ellipse(p.sx, p.sy, rW, rH, 0, 0, Math.PI * 2); x.fill();
+              // Subtle ice rim around opening
+              x.strokeStyle = "rgba(160,200,230,0.5)";
+              x.lineWidth = Math.max(1, 2 * p.sc);
+              x.beginPath(); x.ellipse(p.sx, p.sy, rW + 1, rH + 1, 0, 0, Math.PI * 2); x.stroke();
+              x.restore();
+            }});
+          });
         });
       }
 
