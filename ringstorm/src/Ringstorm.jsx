@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 const D = Math.PI / 180;
-const PW = [{id:"gun",n:"Gun",e:"🔫",c:"#f59e0b"},{id:"boost",n:"Boost",e:"🚀",c:"#22c55e"},{id:"missile",n:"Missile",e:"💥",c:"#ef4444"},{id:"star",n:"Star",e:"⭐",c:"#fbbf24"},{id:"flares",n:"Flares",e:"🛡️",c:"#38bdf8"},{id:"lightning",n:"Storm",e:"⚡",c:"#a855f7"}];
+const PW = [{id:"gun",n:"Gun",e:"🔫",c:"#f59e0b"},{id:"boost",n:"Boost",e:"🚀",c:"#22c55e"},{id:"missile",n:"Missile",e:"💥",c:"#ef4444"},{id:"star",n:"Star",e:"⭐",c:"#fbbf24"},{id:"flares",n:"Flares",e:"🛡️",c:"#38bdf8"},{id:"lightning",n:"Storm",e:"⚡",c:"#a855f7"},{id:"tornado",n:"Tornado",e:"🌪️",c:"#06b6d4"}];
 const LAPS = 3, NG = 6;
 
 export default function Game() {
@@ -279,30 +279,25 @@ export default function Game() {
       }
     }
 
-    // Special storm cube — one per course, always gives lightning
+    // Special cubes — lightning (station 2) and tornado (station 4, race only)
     const stormCubes = [];
-    if (!iB && crs.length > 1) {
-      let sx2, sy2, sz2;
-      if (cr === 0) {
-        // Grand Canyon: between gates 3 and 4, offset to one side
-        const g1 = crs[3], g2 = crs[4 % NG];
-        const mx = (g1.x + g2.x) / 2, mz = (g1.z + g2.z) / 2;
-        const dx = g2.x - g1.x, dz = g2.z - g1.z, len = Math.sqrt(dx * dx + dz * dz) || 1;
-        sx2 = mx + (-dz / len) * 35; sy2 = (g1.y + g2.y) / 2; sz2 = mz + (dx / len) * 35;
-      } else if (cr === 1) {
-        // Island Skies: high up above gate 2
-        const g = crs[2]; sx2 = g.x; sy2 = g.y + 50; sz2 = g.z;
-      } else if (cr === 2) {
-        // Mountain Pass: at the peak (gate 4)
-        const g = crs[4]; sx2 = g.x; sy2 = g.y + 20; sz2 = g.z + 30;
-      } else if (cr === 3) {
-        // Ocean Run: under a rock arch (near gate 1)
-        const g = crs[1]; sx2 = g.x; sy2 = g.y - 10; sz2 = g.z;
-      } else {
-        // Volcano: near volcano base
-        sx2 = 200; sy2 = 120; sz2 = 200;
+    if (crs.length > 1) {
+      // Lightning cube: extra cube at end of station 2
+      const si = 2 < NG ? 2 : 0;
+      const lg1 = crs[si], lg2 = crs[(si + 1) % NG];
+      const lmx = (lg1.x + lg2.x) / 2, lmz = (lg1.z + lg2.z) / 2, lmy = (lg1.y + lg2.y) / 2;
+      const ldx = lg2.x - lg1.x, ldz = lg2.z - lg1.z, llen = Math.sqrt(ldx * ldx + ldz * ldz) || 1;
+      const lpx = -ldz / llen, lpz = ldx / llen;
+      stormCubes.push({ x: lmx + lpx * 75, y: lmy, z: lmz + lpz * 75, active: true, rt: 0, noRespawn: true, gives: "lightning" });
+      // Tornado cube: extra cube at end of station 4 (race only)
+      if (!iB) {
+        const ti = 4 < NG ? 4 : 0;
+        const tg1 = crs[ti], tg2 = crs[(ti + 1) % NG];
+        const tmx = (tg1.x + tg2.x) / 2, tmz = (tg1.z + tg2.z) / 2, tmy = (tg1.y + tg2.y) / 2;
+        const tdx = tg2.x - tg1.x, tdz = tg2.z - tg1.z, tlen = Math.sqrt(tdx * tdx + tdz * tdz) || 1;
+        const tpx = -tdz / tlen, tpz = tdx / tlen;
+        stormCubes.push({ x: tmx + tpx * 75, y: tmy, z: tmz + tpz * 75, active: true, rt: 0, noRespawn: true, gives: "tornado" });
       }
-      stormCubes.push({ x: sx2, y: sy2, z: sz2, active: true, rt: 0, noRespawn: true });
     }
 
     // Flight path safety cleanup — remove terrain objects too close to gates or the path between them
@@ -440,9 +435,9 @@ export default function Game() {
       return weights[weights.length - 1].id;
     }
 
-    const W_FIRST = [{id:"gun",weight:40},{id:"boost",weight:40},{id:"missile",weight:15},{id:"star",weight:3},{id:"flares",weight:2},{id:"lightning",weight:0}];
-    const W_MID   = [{id:"gun",weight:19},{id:"boost",weight:23},{id:"missile",weight:29},{id:"star",weight:10},{id:"flares",weight:16},{id:"lightning",weight:3}];
-    const W_LAST  = [{id:"gun",weight:4},{id:"boost",weight:14},{id:"missile",weight:27},{id:"star",weight:32},{id:"flares",weight:15},{id:"lightning",weight:8}];
+    const W_FIRST = [{id:"gun",weight:40},{id:"boost",weight:40},{id:"missile",weight:15},{id:"star",weight:3},{id:"flares",weight:2}];
+    const W_MID   = [{id:"gun",weight:20},{id:"boost",weight:24},{id:"missile",weight:30},{id:"star",weight:11},{id:"flares",weight:15}];
+    const W_LAST  = [{id:"gun",weight:5},{id:"boost",weight:15},{id:"missile",weight:29},{id:"star",weight:35},{id:"flares",weight:16}];
 
     function getItemForPos(racer) {
       const pos = getRacePos(racer);
@@ -464,12 +459,12 @@ export default function Game() {
           }
         }
       });
-      // Special storm cubes — always give lightning
+      // Special cubes — give lightning or tornado
       stormCubes.forEach(c => {
         if (!c.active) return;
         if (Math.sqrt((r.x - c.x) ** 2 + (r.y - c.y) ** 2 + (r.z - c.z) ** 2) < 20) {
           c.active = false; c.rt = 300;
-          if (r.wp === null) { r.wp = "lightning"; r.wt = 0; }
+          if (r.wp === null) { r.wp = c.gives; r.wt = 0; }
         }
       });
     }
@@ -554,7 +549,10 @@ export default function Game() {
           if (tg.length) pj.push({ x: r.x, y: r.y, z: r.z, vx: sy * 12, vy: 0, vz: cy * 12, l: 180, s: 4, cl: "#ef4444", o: r, hm: 1, tg: tg[Math.floor(Math.random() * tg.length)] });
           r.wp = null;
         } else if (r.wp === "lightning") {
-          storms.push({ x: r.x - sy * 30, y: r.y, z: r.z - cy * 30, timer: 480, owner: r, hit: new Set() });
+          storms.push({ x: r.x - sy * 30, y: r.y, z: r.z - cy * 30, timer: 480, owner: r, hit: new Set(), type: "lightning" });
+          r.wp = null;
+        } else if (r.wp === "tornado") {
+          storms.push({ x: r.x - sy * 30, y: r.y, z: r.z - cy * 30, timer: 480, owner: r, hitRacers: [], type: "tornado" });
           r.wp = null;
         } else { r.wp = null; }
       }
@@ -609,7 +607,11 @@ export default function Game() {
           r.wp = null;
         } else if (r.wp === "lightning") {
           const sy2 = Math.sin(r.yw), cy2 = Math.cos(r.yw);
-          storms.push({ x: r.x - sy2 * 30, y: r.y, z: r.z - cy2 * 30, timer: 480, owner: r, hit: new Set() });
+          storms.push({ x: r.x - sy2 * 30, y: r.y, z: r.z - cy2 * 30, timer: 480, owner: r, hit: new Set(), type: "lightning" });
+          r.wp = null;
+        } else if (r.wp === "tornado") {
+          const sy2 = Math.sin(r.yw), cy2 = Math.cos(r.yw);
+          storms.push({ x: r.x - sy2 * 30, y: r.y, z: r.z - cy2 * 30, timer: 480, owner: r, hitRacers: [], type: "tornado" });
           r.wp = null;
         }
       }
@@ -1145,35 +1147,81 @@ export default function Game() {
         });
       });
 
-      // Lightning storms — electric ground hazards
+      // Storms — lightning and tornado hazards
       storms.forEach(st => {
         const p = proj(st.x, st.y, st.z, cam, vh);
         if (!p || p.d > 600) return;
         const fade = st.timer < 120 ? st.timer / 120 : 1;
-        const sz = 35 * p.sc;
-        rn.push({ d: p.d, f() {
-          x.globalAlpha = 0.3 * fade;
-          x.fillStyle = "rgb(120,60,200)";
-          x.beginPath(); x.arc(p.sx, p.sy, sz, 0, Math.PI * 2); x.fill();
-          // Jagged lightning bolts inside circle
-          x.strokeStyle = `rgba(200,170,255,${0.8 * fade})`; x.lineWidth = 2;
-          for (let i = 0; i < 3; i++) {
-            const ax = p.sx + (Math.random() - 0.5) * sz * 1.6;
-            const ay = p.sy + (Math.random() - 0.5) * sz * 1.2;
-            x.beginPath(); x.moveTo(p.sx + (Math.random() - 0.5) * sz, p.sy + (Math.random() - 0.5) * sz * 0.6);
-            x.lineTo(ax, ay);
-            x.lineTo(ax + (Math.random() - 0.5) * sz * 0.5, ay + (Math.random() - 0.5) * sz * 0.4);
-            x.stroke();
-          }
-          // Electric sparks
-          x.fillStyle = `rgba(220,200,255,${0.9 * fade})`;
-          for (let i = 0; i < 5; i++) {
-            const sx2 = p.sx + (Math.random() - 0.5) * sz * 1.4;
-            const sy2 = p.sy + (Math.random() - 0.5) * sz * 0.8;
-            x.beginPath(); x.arc(sx2, sy2, Math.max(1, 2 * p.sc), 0, Math.PI * 2); x.fill();
-          }
-          x.globalAlpha = 1;
-        }});
+        if (st.type === "tornado") {
+          // Tornado rendering — swirling funnel
+          const sz = 40 * p.sc;
+          rn.push({ d: p.d, f() {
+            x.save();
+            // Bottom ellipse — large base
+            x.globalAlpha = 0.3 * fade;
+            x.fillStyle = "rgb(100,200,220)";
+            x.beginPath(); x.ellipse(p.sx, p.sy, sz, sz * 0.35, 0, 0, Math.PI * 2); x.fill();
+            // Middle ellipse — rotated
+            x.globalAlpha = 0.4 * fade;
+            x.fillStyle = "rgb(130,210,230)";
+            x.save(); x.translate(p.sx, p.sy - 10 * p.sc); x.rotate(fc * 0.05);
+            x.beginPath(); x.ellipse(0, 0, 25 * p.sc, 25 * p.sc * 0.35, 0, 0, Math.PI * 2); x.fill();
+            x.restore();
+            // Top ellipse — small, fast spin
+            x.globalAlpha = 0.5 * fade;
+            x.fillStyle = "rgb(180,230,240)";
+            x.save(); x.translate(p.sx, p.sy - 22 * p.sc); x.rotate(fc * 0.08);
+            x.beginPath(); x.ellipse(0, 0, 12 * p.sc, 12 * p.sc * 0.35, 0, 0, Math.PI * 2); x.fill();
+            x.restore();
+            // Spiral lines connecting ellipses
+            x.strokeStyle = `rgba(150,220,235,${0.25 * fade})`; x.lineWidth = Math.max(1, 1.5 * p.sc);
+            for (let si = 0; si < 2; si++) {
+              x.beginPath();
+              for (let t = 0; t <= 1; t += 0.1) {
+                const ang = fc * 0.06 + si * Math.PI + t * Math.PI * 3;
+                const rad = (40 - 28 * t) * p.sc;
+                const fx = p.sx + Math.cos(ang) * rad;
+                const fy = p.sy - t * 22 * p.sc + Math.sin(ang) * rad * 0.3;
+                if (t === 0) x.moveTo(fx, fy); else x.lineTo(fx, fy);
+              }
+              x.stroke();
+            }
+            // Orbiting debris dots
+            x.fillStyle = `rgba(150,100,60,${0.6 * fade})`;
+            for (let di = 0; di < 5; di++) {
+              const dAng = fc * (0.04 + di * 0.012) + di * 1.3;
+              const dR = (18 + di * 5) * p.sc;
+              const dY = p.sy - di * 4 * p.sc;
+              x.beginPath(); x.arc(p.sx + Math.cos(dAng) * dR, dY + Math.sin(dAng) * dR * 0.3, Math.max(1, 2 * p.sc), 0, Math.PI * 2); x.fill();
+            }
+            x.globalAlpha = 1;
+            x.restore();
+          }});
+        } else {
+          // Lightning storm rendering
+          const sz = 35 * p.sc;
+          rn.push({ d: p.d, f() {
+            x.globalAlpha = 0.3 * fade;
+            x.fillStyle = "rgb(120,60,200)";
+            x.beginPath(); x.arc(p.sx, p.sy, sz, 0, Math.PI * 2); x.fill();
+            x.strokeStyle = `rgba(200,170,255,${0.8 * fade})`; x.lineWidth = 2;
+            for (let i = 0; i < 3; i++) {
+              const ax = p.sx + (Math.random() - 0.5) * sz * 1.6;
+              const ay = p.sy + (Math.random() - 0.5) * sz * 1.2;
+              x.beginPath(); x.moveTo(p.sx + (Math.random() - 0.5) * sz, p.sy + (Math.random() - 0.5) * sz * 0.6);
+              x.lineTo(ax, ay);
+              x.lineTo(ax + (Math.random() - 0.5) * sz * 0.5, ay + (Math.random() - 0.5) * sz * 0.4);
+              x.stroke();
+            }
+            x.fillStyle = `rgba(220,200,255,${0.9 * fade})`;
+            for (let i = 0; i < 5; i++) {
+              const sx2 = p.sx + (Math.random() - 0.5) * sz * 1.4;
+              const sy2 = p.sy + (Math.random() - 0.5) * sz * 0.8;
+              x.beginPath(); x.arc(sx2, sy2, Math.max(1, 2 * p.sc), 0, Math.PI * 2); x.fill();
+            }
+            x.globalAlpha = 1;
+          }});
+        }
       });
 
       // Shadow under player plane
@@ -1353,18 +1401,35 @@ export default function Game() {
       cubes.forEach(c => { if (!c.active) { c.rt--; if (c.rt <= 0) c.active = true; } });
       stormCubes.forEach(c => { if (!c.active && !c.noRespawn) { c.rt--; if (c.rt <= 0) c.active = true; } });
 
-      // Lightning storms — update timers, zap nearby racers
+      // Storms — update timers, apply effects
       storms.forEach(st => {
         st.timer--;
         rs.forEach(r => {
-          if (r === st.owner || r.cr || r.fn || st.hit.has(r)) return;
+          if (r === st.owner || r.cr || r.fn) return;
           if (r.st > 0) return; // star immunity
           const d = Math.sqrt((r.x - st.x) ** 2 + (r.z - st.z) ** 2);
-          if (d < 50) {
-            st.hit.add(r);
-            r.sp = 1; r.bt = 0;
-            // Zap slowdown: force speed to 1 for 60 frames via a zap timer
-            r.zap = 60;
+          if (st.type === "tornado") {
+            // Tornado: pull effect within 60 units
+            if (d < 60) {
+              r.x += (st.x - r.x) * 0.03;
+              r.y += (st.y - r.y) * 0.03;
+              r.z += (st.z - r.z) * 0.03;
+              // Throw at center (< 20 units) if not already thrown by this tornado
+              if (d < 20 && !st.hitRacers.includes(r)) {
+                st.hitRacers.push(r);
+                r.yw += Math.PI; // flip direction
+                r.sp = 2;
+                const sy2 = Math.sin(r.yw), cy2 = Math.cos(r.yw);
+                r.x += sy2 * 30; r.z += cy2 * 30;
+              }
+            }
+          } else {
+            // Lightning: zap once
+            if (d < 50 && !st.hit.has(r)) {
+              st.hit.add(r);
+              r.sp = 1; r.bt = 0;
+              r.zap = 60;
+            }
           }
         });
       });
@@ -1504,7 +1569,7 @@ export default function Game() {
           </div>
         </div>
       </div>
-      <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "20px" }}>🟨 Gold cubes = powerups · 🔫 Gun · 🚀 Boost · 💥 Homing Missile · ⭐ Star · 🛡️ Flares · ⚡ Lightning Storm — drops behind you</div>
+      <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "20px" }}>🟨 Gold cubes = powerups · 🔫 Gun · 🚀 Boost · 💥 Homing Missile · ⭐ Star · 🛡️ Flares · ⚡ Lightning Storm · 🌪️ Tornado — pulls racers in and throws them backward</div>
       <button onClick={() => setSc("menu")} style={{ padding: "12px 28px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "10px", color: "#e2e8f0", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>Back to Menu</button>
     </div>
   );
