@@ -1211,55 +1211,9 @@ export default function Game() {
         }
       });
 
-      // Ice tunnel interiors (Course 5) — dark walls/ceiling visible when inside
+      // Ice Cavern (Course 5) — tunnel visuals are mountain + entrance + icicles only
+      // Collision still enforces invisible walls/ceiling
       if (cr === 5) {
-        tunnels.forEach(secs => {
-          for (let i = 0; i < secs.length - 1; i++) {
-            const a = secs[i], b2 = secs[i + 1];
-            const mx = (a.cx + b2.cx) / 2, mz = (a.cz + b2.cz) / 2;
-            const dist = Math.sqrt((mx - vw.x) ** 2 + (mz - vw.z) ** 2);
-            if (dist > 300) continue; // Only render interior when close
-            const al = Math.max(0.4, 1 - dist / 300);
-            // Left wall — dark ice interior
-            const pLB_a = proj(a.lx, a.baseY, a.lz, cam, vh);
-            const pLT_a = proj(a.lx, a.ceilY, a.lz, cam, vh);
-            const pLB_b = proj(b2.lx, b2.baseY, b2.lz, cam, vh);
-            const pLT_b = proj(b2.lx, b2.ceilY, b2.lz, cam, vh);
-            if (pLB_a && pLT_a && pLB_b && pLT_b) {
-              rn.push({ d: (pLB_a.d + pLB_b.d) / 2, f() {
-                x.globalAlpha = al * 0.9;
-                x.fillStyle = "rgb(50,65,85)";
-                x.beginPath(); x.moveTo(pLB_a.sx, pLB_a.sy); x.lineTo(pLT_a.sx, pLT_a.sy);
-                x.lineTo(pLT_b.sx, pLT_b.sy); x.lineTo(pLB_b.sx, pLB_b.sy); x.closePath(); x.fill();
-                x.globalAlpha = 1;
-              }});
-            }
-            // Right wall — dark ice interior
-            const pRB_a = proj(a.rx, a.baseY, a.rz, cam, vh);
-            const pRT_a = proj(a.rx, a.ceilY, a.rz, cam, vh);
-            const pRB_b = proj(b2.rx, b2.baseY, b2.rz, cam, vh);
-            const pRT_b = proj(b2.rx, b2.ceilY, b2.rz, cam, vh);
-            if (pRB_a && pRT_a && pRB_b && pRT_b) {
-              rn.push({ d: (pRB_a.d + pRB_b.d) / 2, f() {
-                x.globalAlpha = al * 0.9;
-                x.fillStyle = "rgb(50,65,85)";
-                x.beginPath(); x.moveTo(pRB_a.sx, pRB_a.sy); x.lineTo(pRT_a.sx, pRT_a.sy);
-                x.lineTo(pRT_b.sx, pRT_b.sy); x.lineTo(pRB_b.sx, pRB_b.sy); x.closePath(); x.fill();
-                x.globalAlpha = 1;
-              }});
-            }
-            // Ceiling — slightly lighter dark ice
-            if (pLT_a && pRT_a && pLT_b && pRT_b) {
-              rn.push({ d: (pLT_a.d + pRT_a.d) / 2 - 1, f() {
-                x.globalAlpha = al * 0.85;
-                x.fillStyle = "rgb(60,75,95)";
-                x.beginPath(); x.moveTo(pLT_a.sx, pLT_a.sy); x.lineTo(pRT_a.sx, pRT_a.sy);
-                x.lineTo(pRT_b.sx, pRT_b.sy); x.lineTo(pLT_b.sx, pLT_b.sy); x.closePath(); x.fill();
-                x.globalAlpha = 1;
-              }});
-            }
-          }
-        });
         // Icicles
         icicles.forEach(ic => {
           const dist = Math.sqrt((ic.x - vw.x) ** 2 + (ic.z - vw.z) ** 2);
