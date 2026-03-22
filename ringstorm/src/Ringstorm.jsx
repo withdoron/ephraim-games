@@ -350,7 +350,7 @@ export default function Game() {
         // Battle: wide circle, facing tangent direction
         const ang = (i / ads.length) * Math.PI * 2;
         sx = Math.cos(ang) * 200; sy2 = 200; sz = Math.sin(ang) * 200;
-        syw = ang + Math.PI / 2; // tangent to circle
+        syw = Math.atan2(0 - sx, 0 - sz); // face toward center
       } else {
         const row = Math.floor(i / 2), col = i % 2;
         const ox = (col === 0 ? -20 : 20), oz = -row * 45 - 70;
@@ -1472,7 +1472,7 @@ export default function Game() {
       }
       if (pauseRef.current) return;
       if (cd > 0) { cd--; fc++; return; }
-      if (!started) { started = 1; rs.forEach(r => { r.th = 1; r.sp = 0.5; }); }
+      if (!started) { started = 1; rs.forEach(r => { r.th = 1; r.sp = iB ? 0 : 0.5; }); }
       rt++;
 
       const pl = rs.filter(r => !r.npc);
