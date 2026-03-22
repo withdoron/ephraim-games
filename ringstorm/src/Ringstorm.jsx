@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 const D = Math.PI / 180;
-const PW = [{id:"gun",n:"Gun",e:"🔫",c:"#f59e0b"},{id:"boost",n:"Boost",e:"🚀",c:"#22c55e"},{id:"missile",n:"Missile",e:"💥",c:"#ef4444"},{id:"star",n:"Star",e:"⭐",c:"#fbbf24"},{id:"flares",n:"Flares",e:"🛡️",c:"#38bdf8"}];
+const PW = [{id:"gun",n:"Gun",e:"🔫",c:"#f59e0b"},{id:"boost",n:"Boost",e:"🚀",c:"#22c55e"},{id:"missile",n:"Missile",e:"💥",c:"#ef4444"},{id:"star",n:"Star",e:"⭐",c:"#fbbf24"},{id:"flares",n:"Flares",e:"🛡️",c:"#38bdf8"},{id:"lightning",n:"Storm",e:"⚡",c:"#a855f7"}];
 const LAPS = 3, NG = 6;
 
 export default function Game() {
@@ -177,7 +177,7 @@ export default function Game() {
       }
     }
 
-    // Rock arches (Ocean Run scenery) — 3 arches near gates 1, 3, 5
+    // Rock arches (Ocean Run scenery) — 3 big arches near gates 1, 3, 5
     const arches = [];
     if (!iB && cr === 3 && crs.length > 1) {
       [1, 3, 5].forEach(gi => {
@@ -187,11 +187,11 @@ export default function Game() {
         const dx = g2.x - g.x, dz = g2.z - g.z;
         const len = Math.sqrt(dx * dx + dz * dz) || 1;
         const px = -dz / len, pz = dx / len;
-        const spread = 55 + Math.random() * 20;
+        const spread = 80 + Math.random() * 20;
         arches.push({
           lx: g.x + px * spread, lz: g.z + pz * spread,
           rx: g.x - px * spread, rz: g.z - pz * spread,
-          y: -25, ht: 70 + Math.random() * 30, w: 12
+          y: -25, ht: 100 + Math.random() * 40, w: 35
         });
       });
     }
@@ -279,6 +279,32 @@ export default function Game() {
       }
     }
 
+    // Special storm cube — one per course, always gives lightning
+    const stormCubes = [];
+    if (!iB && crs.length > 1) {
+      let sx2, sy2, sz2;
+      if (cr === 0) {
+        // Grand Canyon: between gates 3 and 4, offset to one side
+        const g1 = crs[3], g2 = crs[4 % NG];
+        const mx = (g1.x + g2.x) / 2, mz = (g1.z + g2.z) / 2;
+        const dx = g2.x - g1.x, dz = g2.z - g1.z, len = Math.sqrt(dx * dx + dz * dz) || 1;
+        sx2 = mx + (-dz / len) * 35; sy2 = (g1.y + g2.y) / 2; sz2 = mz + (dx / len) * 35;
+      } else if (cr === 1) {
+        // Island Skies: high up above gate 2
+        const g = crs[2]; sx2 = g.x; sy2 = g.y + 50; sz2 = g.z;
+      } else if (cr === 2) {
+        // Mountain Pass: at the peak (gate 4)
+        const g = crs[4]; sx2 = g.x; sy2 = g.y + 20; sz2 = g.z + 30;
+      } else if (cr === 3) {
+        // Ocean Run: under a rock arch (near gate 1)
+        const g = crs[1]; sx2 = g.x; sy2 = g.y - 10; sz2 = g.z;
+      } else {
+        // Volcano: near volcano base
+        sx2 = 200; sy2 = 120; sz2 = 200;
+      }
+      stormCubes.push({ x: sx2, y: sy2, z: sz2, active: true, rt: 0 });
+    }
+
     // Flight path safety cleanup — remove terrain objects too close to gates or the path between them
     if (!iB && crs.length > 1) {
       const clearR = 80;
@@ -318,7 +344,7 @@ export default function Game() {
       { id: "n2", nm: "BLAZE", ac: "#f59e0b", cp: "#fbbf24", sc: "#1a1a1a", npc: 1 },
       { id: "n3", nm: "STORM", ac: "#a855f7", cp: "#c084fc", sc: "#1a1a1a", npc: 1 },
     ];
-    const ads = iB ? (i2 ? defs.slice(0, 2) : [defs[0], defs[2]]) : (i2 ? defs : [defs[0], ...defs.slice(2)]);
+    const ads = iB ? (i2 ? [...defs] : [defs[0], ...defs.slice(2)]) : (i2 ? defs : [defs[0], ...defs.slice(2)]);
     const startY = cr === 3 ? 100 : cr === 1 ? 230 : 200;
     const sp = iB ? { x: 0, y: 200, z: 0 } : (crs[0] ? { ...crs[0], y: startY } : { x: 0, y: startY, z: 0 });
     const sd = (!iB && crs.length > 1) ? Math.atan2(crs[0].x - crs[NG - 1].x, crs[0].z - crs[NG - 1].z) : 0;
@@ -333,12 +359,12 @@ export default function Game() {
         th: 0, tp: 0, tr: 0, wp: null, wt: 0, st: 0, bt: 0,
         cr: 0, ct: 0, cx: 0, cy: 0, cz: 0, ep: [],
         ng: 0, lp: 0, fn: 0, ft: 0, fp: 0, hf: 0,
-        nw: Math.random() * 6, ns: 0.7 + Math.random() * 0.3, lv: 3, kl: 0,
+        nw: Math.random() * 6, ns: 0.7 + Math.random() * 0.3, lv: 3, kl: 0, zap: 0,
       };
     });
 
     const cm = rs.filter(r => !r.npc).map(r => ({ x: r.x, y: r.y + 20, z: r.z - 50, lx: r.x, ly: r.y, lz: r.z }));
-    let pj = [], fc = 0, cd = 240, started = 0, rt = 0, fo = [];
+    let pj = [], storms = [], fc = 0, cd = 240, started = 0, rt = 0, fo = [];
 
     function boom(p) {
       if (p.st > 0) return;
@@ -380,6 +406,14 @@ export default function Game() {
         const d = Math.sqrt((r.x - il.x) ** 2 + (r.z - il.z) ** 2);
         if (d < il.w + 8 && r.y < il.y + il.h / 2 && r.y > il.y - il.h / 2) { boom(r); return 1; }
       }
+      for (const ar of arches) {
+        // Left pillar collision
+        const dL = Math.sqrt((r.x - ar.lx) ** 2 + (r.z - ar.lz) ** 2);
+        if (dL < 20 && r.y > ar.y && r.y < ar.y + ar.ht) { boom(r); return 1; }
+        // Right pillar collision
+        const dR = Math.sqrt((r.x - ar.rx) ** 2 + (r.z - ar.rz) ** 2);
+        if (dR < 20 && r.y > ar.y && r.y < ar.y + ar.ht) { boom(r); return 1; }
+      }
       if (r.y > 600) r.y = 600;
       return 0;
     }
@@ -406,9 +440,9 @@ export default function Game() {
       return weights[weights.length - 1].id;
     }
 
-    const W_FIRST = [{id:"gun",weight:40},{id:"boost",weight:40},{id:"missile",weight:15},{id:"star",weight:3},{id:"flares",weight:2}];
-    const W_MID   = [{id:"gun",weight:20},{id:"boost",weight:25},{id:"missile",weight:30},{id:"star",weight:10},{id:"flares",weight:15}];
-    const W_LAST  = [{id:"gun",weight:5},{id:"boost",weight:15},{id:"missile",weight:30},{id:"star",weight:35},{id:"flares",weight:15}];
+    const W_FIRST = [{id:"gun",weight:40},{id:"boost",weight:40},{id:"missile",weight:15},{id:"star",weight:3},{id:"flares",weight:2},{id:"lightning",weight:0}];
+    const W_MID   = [{id:"gun",weight:19},{id:"boost",weight:23},{id:"missile",weight:29},{id:"star",weight:10},{id:"flares",weight:16},{id:"lightning",weight:3}];
+    const W_LAST  = [{id:"gun",weight:4},{id:"boost",weight:14},{id:"missile",weight:27},{id:"star",weight:32},{id:"flares",weight:15},{id:"lightning",weight:8}];
 
     function getItemForPos(racer) {
       const pos = getRacePos(racer);
@@ -430,12 +464,44 @@ export default function Game() {
           }
         }
       });
+      // Special storm cubes — always give lightning
+      stormCubes.forEach(c => {
+        if (!c.active) return;
+        if (Math.sqrt((r.x - c.x) ** 2 + (r.y - c.y) ** 2 + (r.z - c.z) ** 2) < 20) {
+          c.active = false; c.rt = 300;
+          if (r.wp === null) { r.wp = "lightning"; r.wt = 0; }
+        }
+      });
     }
 
     function checkGate(r) {
       if (iB || !crs.length) return;
       const g = crs[r.ng];
-      if (Math.sqrt((r.x - g.x) ** 2 + (r.y - g.y) ** 2 + (r.z - g.z) ** 2) < g.sz + 18) {
+      const dx = r.x - g.x, dy = r.y - g.y, dz = r.z - g.z;
+      const dist3 = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      // Check if close enough to interact with gate
+      if (dist3 < g.sz + 18) {
+        // Check if racer hits the ring edge (outer 20%) vs passes through center (inner 80%)
+        const distCenter = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const dist2d = Math.sqrt(dx * dx + dz * dz); // horizontal distance for ring edge check
+        // Gate plane check: within 15 units along course direction
+        const ng2 = (r.ng + 1) % NG;
+        const gn = crs[ng2];
+        const cdx = gn.x - g.x, cdz = gn.z - g.z;
+        const clen = Math.sqrt(cdx * cdx + cdz * cdz) || 1;
+        const along = (dx * cdx + dz * cdz) / clen;
+        if (Math.abs(along) < 15) {
+          // In the gate plane — check if hitting ring edge
+          const hDist = Math.sqrt(dx * dx + dz * dz);
+          const vDist = Math.abs(dy);
+          // Elliptical gate: horizontal radius = sz, vertical radius = sz*0.35
+          const ellipseDist = Math.sqrt((hDist / g.sz) ** 2 + (vDist / (g.sz * 0.35)) ** 2);
+          if (ellipseDist > 0.8 && ellipseDist < 1.15) {
+            // Hit the ring edge
+            boom(r); return;
+          }
+        }
+        // Passed through successfully
         r.ng++;
         if (r.ng >= NG) { r.ng = 0; r.lp++; if (r.lp >= LAPS) { r.fn = 1; r.ft = rt; fo.push(r); r.fp = fo.length; } }
       }
@@ -487,6 +553,9 @@ export default function Game() {
           const tg = rs.filter(t => t !== r && !t.cr && !t.fn);
           if (tg.length) pj.push({ x: r.x, y: r.y, z: r.z, vx: sy * 12, vy: 0, vz: cy * 12, l: 180, s: 4, cl: "#ef4444", o: r, hm: 1, tg: tg[Math.floor(Math.random() * tg.length)] });
           r.wp = null;
+        } else if (r.wp === "lightning") {
+          storms.push({ x: r.x - sy * 30, y: r.y, z: r.z - cy * 30, timer: 480, owner: r, hit: new Set() });
+          r.wp = null;
         } else { r.wp = null; }
       }
 
@@ -537,6 +606,10 @@ export default function Game() {
         else if (r.wp === "flares") {
           for (let i = 0; i < 6; i++) pj.push({ x: r.x, y: r.y, z: r.z, vx: (Math.random() - 0.5) * 12, vy: -Math.random() * 5 - 2, vz: (Math.random() - 0.5) * 12, l: 50, s: 3, cl: "#fff", o: r, hm: 0, fl: 1 });
           r.hf = 1; setTimeout(() => { r.hf = 0; }, 2000);
+          r.wp = null;
+        } else if (r.wp === "lightning") {
+          const sy2 = Math.sin(r.yw), cy2 = Math.cos(r.yw);
+          storms.push({ x: r.x - sy2 * 30, y: r.y, z: r.z - cy2 * 30, timer: 480, owner: r, hit: new Set() });
           r.wp = null;
         }
       }
@@ -759,42 +832,64 @@ export default function Game() {
         }});
       });
 
-      // Rock arches (Ocean Run)
+      // Rock arches (Ocean Run) — thick layered rock pillars + beam
       arches.forEach(ar => {
         const midX = (ar.lx + ar.rx) / 2, midZ = (ar.lz + ar.rz) / 2;
         const dist = Math.sqrt((midX - vw.x) ** 2 + (midZ - vw.z) ** 2);
         if (dist > 800) return;
         const al = Math.max(0.3, 1 - dist / 800);
-        // Left pillar
         const pLB = proj(ar.lx, ar.y, ar.lz, cam, vh);
         const pLT = proj(ar.lx, ar.y + ar.ht, ar.lz, cam, vh);
-        // Right pillar
         const pRB = proj(ar.rx, ar.y, ar.rz, cam, vh);
         const pRT = proj(ar.rx, ar.y + ar.ht, ar.rz, cam, vh);
         if (!pLB || !pLT || !pRB || !pRT) return;
         const avgD = (pLB.d + pRB.d) / 2;
-        // Pillars
         rn.push({ d: avgD, f() {
           x.globalAlpha = al;
-          // Left pillar
-          const lw = Math.max(4, ar.w * pLB.sc);
-          x.fillStyle = "rgb(55,45,40)";
-          x.fillRect(pLB.sx - lw / 2, Math.min(pLT.sy, pLB.sy), lw, Math.abs(pLB.sy - pLT.sy) || 2);
-          // Right pillar
-          const rw = Math.max(4, ar.w * pRB.sc);
-          x.fillStyle = "rgb(60,50,42)";
-          x.fillRect(pRB.sx - rw / 2, Math.min(pRT.sy, pRB.sy), rw, Math.abs(pRB.sy - pRT.sy) || 2);
-          // Connecting arch top — curved
-          x.fillStyle = "rgb(75,60,50)";
+          const lw = Math.max(8, ar.w * pLB.sc);
+          const rw2 = Math.max(8, ar.w * pRB.sc);
+          // Layered rock pillars — 3 color bands
+          const bands = [["rgb(90,55,35)", 0, 0.33], ["rgb(160,75,40)", 0.33, 0.66], ["rgb(200,130,70)", 0.66, 1]];
+          bands.forEach(([col, t0, t1]) => {
+            // Left pillar band
+            const lyB = pLB.sy + (pLT.sy - pLB.sy) * t0;
+            const lyT = pLB.sy + (pLT.sy - pLB.sy) * t1;
+            x.fillStyle = col;
+            x.fillRect(pLB.sx - lw / 2, Math.min(lyB, lyT), lw, Math.abs(lyT - lyB) || 1);
+            // Right pillar band
+            const ryB = pRB.sy + (pRT.sy - pRB.sy) * t0;
+            const ryT = pRB.sy + (pRT.sy - pRB.sy) * t1;
+            x.fillRect(pRB.sx - rw2 / 2, Math.min(ryB, ryT), rw2, Math.abs(ryT - ryB) || 1);
+          });
+          // Thick connecting beam — 18 units thick
+          const beamH = Math.max(6, 18 * ((pLT.sc + pRT.sc) / 2));
+          const cpY = Math.min(pLT.sy, pRT.sy) - beamH * 0.8;
+          // Bottom edge of beam
+          x.fillStyle = "rgb(160,75,40)";
           x.beginPath();
           x.moveTo(pLT.sx - lw / 2, pLT.sy);
           x.lineTo(pLT.sx + lw / 2, pLT.sy);
-          const cpY = Math.min(pLT.sy, pRT.sy) - 12 * ((pLT.sc + pRT.sc) / 2);
-          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY, pRT.sx - rw / 2, pRT.sy);
-          x.lineTo(pRT.sx + rw / 2, pRT.sy);
-          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY - 5 * ((pLT.sc + pRT.sc) / 2), pLT.sx - lw / 2, pLT.sy);
-          x.closePath();
-          x.fill();
+          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY + beamH, pRT.sx - rw2 / 2, pRT.sy);
+          x.lineTo(pRT.sx + rw2 / 2, pRT.sy);
+          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY + beamH * 0.5, pLT.sx - lw / 2, pLT.sy);
+          x.closePath(); x.fill();
+          // Top edge of beam
+          x.fillStyle = "rgb(200,130,70)";
+          x.beginPath();
+          x.moveTo(pLT.sx - lw / 2, pLT.sy - beamH);
+          x.lineTo(pLT.sx + lw / 2, pLT.sy - beamH);
+          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY, pRT.sx - rw2 / 2, pRT.sy - beamH);
+          x.lineTo(pRT.sx + rw2 / 2, pRT.sy - beamH);
+          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY - beamH * 0.3, pLT.sx - lw / 2, pLT.sy - beamH);
+          x.closePath(); x.fill();
+          // Fill between top and bottom edges
+          x.fillStyle = "rgb(130,65,35)";
+          x.beginPath();
+          x.moveTo(pLT.sx + lw / 2, pLT.sy - beamH);
+          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY, pRT.sx - rw2 / 2, pRT.sy - beamH);
+          x.lineTo(pRT.sx - rw2 / 2, pRT.sy);
+          x.quadraticCurveTo((pLT.sx + pRT.sx) / 2, cpY + beamH, pLT.sx + lw / 2, pLT.sy);
+          x.closePath(); x.fill();
           x.globalAlpha = 1;
         }});
       });
@@ -877,31 +972,36 @@ export default function Game() {
         }
       });
 
-      // Course gates
+      // Course gates — solid torus rings
       if (!iB) crs.forEach((ring, idx) => {
         const p = proj(ring.x, ring.y, ring.z, cam, vh);
         if (!p || p.d > 800) return;
         const isN = idx === vw.ng;
-        const isPassed = idx < vw.ng || (vw.lp > 0 && idx >= vw.ng);
+        const isPassed = (!isN && idx < vw.ng) || (vw.lp > 0 && !isN && idx > vw.ng);
         const pulse = isN ? 1 + Math.sin(fc * 0.08) * 0.1 : 1;
         const s = ring.sz * p.sc * pulse;
         if (s < 2) return;
         rn.push({ d: p.d, f() {
-          const gateAl = isPassed && !isN ? 0.05 : 1;
+          const gateAl = isPassed ? 0.05 : 1;
           x.globalAlpha = gateAl;
+          // Solid filled ring band (outer - inner)
+          const outerRx = s, outerRy = s * 0.35;
+          const innerRx = s * 0.8, innerRy = s * 0.28;
+          x.fillStyle = isN ? "rgba(50,255,50,0.2)" : "rgba(255,200,50,0.05)";
+          x.beginPath(); x.ellipse(p.sx, p.sy, outerRx, outerRy, 0, 0, Math.PI * 2); x.ellipse(p.sx, p.sy, innerRx, innerRy, 0, 0, Math.PI * 2); x.fill("evenodd");
           // Outer thick glow stroke
-          x.strokeStyle = isN ? "rgba(50,255,50,0.3)" : "rgba(255,200,50,0.06)";
-          x.lineWidth = isN ? Math.max(6, s * 0.25) : Math.max(2, s * 0.1);
+          x.strokeStyle = isN ? "rgba(50,255,50,0.4)" : "rgba(255,200,50,0.06)";
+          x.lineWidth = isN ? Math.max(8, s * 0.3) : Math.max(3, s * 0.15);
           x.beginPath(); x.ellipse(p.sx, p.sy, s, s * 0.35, 0, 0, Math.PI * 2); x.stroke();
           // Inner bright stroke
           x.strokeStyle = isN ? "rgba(50,255,50,1)" : "rgba(255,200,50,0.15)";
-          x.lineWidth = isN ? Math.max(2, s * 0.08) : Math.max(1, s * 0.04);
+          x.lineWidth = isN ? Math.max(3, s * 0.1) : Math.max(1, s * 0.06);
           if (isN) { x.shadowColor = "rgba(50,255,50,0.6)"; x.shadowBlur = 12; }
           x.beginPath(); x.ellipse(p.sx, p.sy, s, s * 0.35, 0, 0, Math.PI * 2); x.stroke();
           // Second inner ring for next gate
           if (isN) {
             const s2 = s * 0.7;
-            x.strokeStyle = "rgba(100,255,100,0.5)"; x.lineWidth = Math.max(1, s2 * 0.06);
+            x.strokeStyle = "rgba(100,255,100,0.6)"; x.lineWidth = Math.max(1.5, s2 * 0.08);
             x.beginPath(); x.ellipse(p.sx, p.sy, s2, s2 * 0.35, 0, 0, Math.PI * 2); x.stroke();
           }
           x.shadowBlur = 0;
@@ -960,6 +1060,35 @@ export default function Game() {
         }});
       });
 
+      // Special storm cubes — purple electric cubes
+      stormCubes.forEach(c => {
+        const p = proj(c.x, c.y, c.z, cam, vh);
+        if (!p || p.d > 600) return;
+        const s = 14 * p.sc;
+        if (s < 1.5) return;
+        rn.push({ d: p.d, f() {
+          x.save(); x.translate(p.sx, p.sy);
+          const spin = Math.sin(fc * 0.04 + c.x) * 0.25;
+          x.rotate(Math.PI / 4 + spin);
+          if (c.active) {
+            x.shadowColor = "rgba(168,85,247,0.6)"; x.shadowBlur = 10;
+            x.fillStyle = "rgb(140,80,220)";
+            x.fillRect(-s, -s, s * 2, s * 2);
+            x.shadowBlur = 0;
+            x.strokeStyle = "rgb(100,50,180)"; x.lineWidth = Math.max(1, s * 0.12);
+            x.strokeRect(-s, -s, s * 2, s * 2);
+            x.rotate(-(Math.PI / 4 + spin));
+            x.fillStyle = "#fff"; x.font = `bold ${Math.max(7, s * 1.3) | 0}px Georgia`;
+            x.textAlign = "center"; x.textBaseline = "middle";
+            x.fillText("⚡", 0, 0);
+          } else {
+            x.strokeStyle = "rgba(168,85,247,0.12)"; x.lineWidth = 1;
+            x.strokeRect(-s, -s, s * 2, s * 2);
+          }
+          x.restore();
+        }});
+      });
+
       // Other racers — angular sci-fi fighter
       rs.forEach(r => {
         if (r === vw || r.cr || r.fn) return;
@@ -1008,6 +1137,37 @@ export default function Game() {
             x.beginPath(); x.arc(p.sx, p.sy, s, 0, Math.PI * 2); x.fill();
           }});
         });
+      });
+
+      // Lightning storms — electric ground hazards
+      storms.forEach(st => {
+        const p = proj(st.x, st.y, st.z, cam, vh);
+        if (!p || p.d > 600) return;
+        const fade = st.timer < 120 ? st.timer / 120 : 1;
+        const sz = 35 * p.sc;
+        rn.push({ d: p.d, f() {
+          x.globalAlpha = 0.3 * fade;
+          x.fillStyle = "rgb(120,60,200)";
+          x.beginPath(); x.arc(p.sx, p.sy, sz, 0, Math.PI * 2); x.fill();
+          // Jagged lightning bolts inside circle
+          x.strokeStyle = `rgba(200,170,255,${0.8 * fade})`; x.lineWidth = 2;
+          for (let i = 0; i < 3; i++) {
+            const ax = p.sx + (Math.random() - 0.5) * sz * 1.6;
+            const ay = p.sy + (Math.random() - 0.5) * sz * 1.2;
+            x.beginPath(); x.moveTo(p.sx + (Math.random() - 0.5) * sz, p.sy + (Math.random() - 0.5) * sz * 0.6);
+            x.lineTo(ax, ay);
+            x.lineTo(ax + (Math.random() - 0.5) * sz * 0.5, ay + (Math.random() - 0.5) * sz * 0.4);
+            x.stroke();
+          }
+          // Electric sparks
+          x.fillStyle = `rgba(220,200,255,${0.9 * fade})`;
+          for (let i = 0; i < 5; i++) {
+            const sx2 = p.sx + (Math.random() - 0.5) * sz * 1.4;
+            const sy2 = p.sy + (Math.random() - 0.5) * sz * 0.8;
+            x.beginPath(); x.arc(sx2, sy2, Math.max(1, 2 * p.sc), 0, Math.PI * 2); x.fill();
+          }
+          x.globalAlpha = 1;
+        }});
       });
 
       // Shadow under player plane
@@ -1185,6 +1345,26 @@ export default function Game() {
       rs.forEach(pl => { if (pl.cr || pl.fn) return; pj.forEach(pr => { if (pr.o === pl) return; if (Math.sqrt((pl.x - pr.x) ** 2 + (pl.y - pr.y) ** 2 + (pl.z - pr.z) ** 2) < 15) { boomFrom(pl, pr.o); pr.l = 0; } }); });
       pj = pj.filter(p => p.l > 0);
       cubes.forEach(c => { if (!c.active) { c.rt--; if (c.rt <= 0) c.active = true; } });
+      stormCubes.forEach(c => { if (!c.active) { c.rt--; if (c.rt <= 0) c.active = true; } });
+
+      // Lightning storms — update timers, zap nearby racers
+      storms.forEach(st => {
+        st.timer--;
+        rs.forEach(r => {
+          if (r === st.owner || r.cr || r.fn || st.hit.has(r)) return;
+          if (r.st > 0) return; // star immunity
+          const d = Math.sqrt((r.x - st.x) ** 2 + (r.z - st.z) ** 2);
+          if (d < 50) {
+            st.hit.add(r);
+            r.sp = 1; r.bt = 0;
+            // Zap slowdown: force speed to 1 for 60 frames via a zap timer
+            r.zap = 60;
+          }
+        });
+      });
+      storms = storms.filter(st => st.timer > 0);
+      // Apply zap slowdown
+      rs.forEach(r => { if (r.zap > 0) { r.sp = Math.min(r.sp, 1); r.zap--; } });
 
       // End conditions
       if (iB) {
@@ -1318,7 +1498,7 @@ export default function Game() {
           </div>
         </div>
       </div>
-      <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "20px" }}>🟣 Purple rings = powerups · 🔫 Gun · 🚀 Boost · 💥 Homing Missile · ⭐ Star · 🛡️ Flares</div>
+      <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "20px" }}>🟨 Gold cubes = powerups · 🔫 Gun · 🚀 Boost · 💥 Homing Missile · ⭐ Star · 🛡️ Flares · ⚡ Lightning Storm — drops behind you</div>
       <button onClick={() => setSc("menu")} style={{ padding: "12px 28px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "10px", color: "#e2e8f0", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>Back to Menu</button>
     </div>
   );
