@@ -3,6 +3,14 @@ import { useState, useEffect, useRef } from "react";
 const D = Math.PI / 180;
 const PW = [{id:"gun",n:"Gun",e:"🔫",c:"#f59e0b"},{id:"boost",n:"Boost",e:"🚀",c:"#22c55e"},{id:"missile",n:"Missile",e:"💥",c:"#ef4444"},{id:"star",n:"Star",e:"⭐",c:"#fbbf24"},{id:"flares",n:"Flares",e:"🛡️",c:"#38bdf8"},{id:"lightning",n:"Storm",e:"⚡",c:"#a855f7"},{id:"tornado",n:"Tornado",e:"🌪️",c:"#06b6d4"}];
 const LAPS = 3, NG = 6;
+const SHORTCUTS = [
+  { cr: 0, gateFrom: 2, gateTo: 3, gateskip: 1, type: "canyon" },
+  { cr: 1, gateFrom: 4, gateTo: 5, gateskip: 1, type: "island" },
+  { cr: 2, gateFrom: 3, gateTo: 4, gateskip: 1, type: "mountain" },
+  { cr: 3, gateFrom: 0, gateTo: 1, gateskip: 1, type: "ocean" },
+  { cr: 4, gateFrom: 3, gateTo: 4, gateskip: 1, type: "volcano" },
+  { cr: 5, gateFrom: 0, gateTo: 1, gateskip: 1, type: "ice" },
+];
 
 export default function Game() {
   const cv = useRef(null);
@@ -327,6 +335,52 @@ export default function Game() {
         });
       }
     }
+    // Shortcut bonus gates — one per course (race only)
+    const bonusGates = [];
+    if (!iB && crs.length > 1) {
+      const scut = SHORTCUTS.find(s => s.cr === cr);
+      if (scut) {
+        const g1 = crs[scut.gateFrom], g2 = crs[scut.gateTo];
+        const mx = (g1.x + g2.x) / 2, mz = (g1.z + g2.z) / 2, my = (g1.y + g2.y) / 2;
+        const ddx = g2.x - g1.x, ddz = g2.z - g1.z;
+        const dlen = Math.sqrt(ddx * ddx + ddz * ddz) || 1;
+        const px = -ddz / dlen, pz = ddx / dlen;
+        let bx = mx, by = my, bz = mz;
+        if (scut.type === "canyon") { bx = mx - px * 180; bz = mz - pz * 180; }
+        else if (scut.type === "island") { bx = mx + px * 80; bz = mz + pz * 80; by = my - 40; }
+        else if (scut.type === "mountain") { bx = mx + px * 100; bz = mz + pz * 100; by = my - 20; }
+        else if (scut.type === "ocean") { bx = mx + px * 120; bz = mz + pz * 120; by = 40; }
+        else if (scut.type === "volcano") {
+          const toC = Math.atan2(-mx, -mz);
+          bx = mx + Math.sin(toC) * 100; bz = mz + Math.cos(toC) * 100; by = my + 20;
+        }
+        else if (scut.type === "ice") { bx = mx + px * 60; bz = mz + pz * 60; by = my - 15; }
+        bonusGates.push({ x: bx, y: by, z: bz, sz: 25, gateFrom: scut.gateFrom, gateskip: scut.gateskip, type: scut.type });
+      }
+      // Canyon shortcut: remove 2 right-wall segments between gates 2-3 to create a gap
+      if (cr === 0 && bonusGates.length > 0) {
+        const removeOrds = [10, 11];
+        for (let i2 = canyon.length - 1; i2 >= 0; i2--) {
+          if (canyon[i2].side === 1 && removeOrds.includes(canyon[i2].ord)) canyon.splice(i2, 1);
+        }
+        canyonR.length = 0;
+        canyon.forEach(c => { if (c.side === 1) canyonR.push(c); });
+      }
+      // Island shortcut: add large island above bonus gate
+      if (cr === 1 && bonusGates.length > 0) {
+        const bg = bonusGates[0];
+        islands.push({ x: bg.x, z: bg.z, y: bg.y + 30, w: 40, h: 20 });
+      }
+      // Ocean shortcut: add extra arch near bonus gate
+      if (cr === 3 && bonusGates.length > 0) {
+        const bg = bonusGates[0];
+        const adx = crs[1].x - crs[0].x, adz = crs[1].z - crs[0].z;
+        const alen = Math.sqrt(adx * adx + adz * adz) || 1;
+        const apx = -adz / alen, apz = adx / alen;
+        arches.push({ lx: bg.x + apx * 50, lz: bg.z + apz * 50, rx: bg.x - apx * 50, rz: bg.z - apz * 50, y: -25, ht: 55 + Math.random() * 15, w: 16 + Math.random() * 5 });
+      }
+    }
+
     // Generate mystery cube stations — race: 1 station per gate pair, battle: 4 stations (N/S/E/W)
     if (iB) {
       for (let i = 0; i < 4; i++) {
@@ -437,6 +491,7 @@ export default function Game() {
         cr: 0, ct: 0, cx: 0, cy: 0, cz: 0, ep: [],
         ng: 0, lp: 0, fn: 0, ft: 0, fp: 0, hf: 0,
         nw: Math.random() * 6, ns: 0.7 + Math.random() * 0.3, lv: 3, kl: 0, zap: 0, tumble: 0,
+        slDraft: 0, slTarget: null, slBoost: 0, scUsed: new Set(),
       };
     });
 
@@ -470,6 +525,7 @@ export default function Game() {
     let pj = [], storms = [], fc = 0, cd = 240, started = 0, rt = 0, fo = [];
     let tsunami = { active: false, triggered: false, angle: 0, progress: 0, duration: 420, spray: [] };
     let earthquake = { active: false, triggered: false, progress: 0, duration: 360, intensity: 0, rocks: [] };
+    let replayBuf = [], replayMode = false, replayFrame = 0, firstFinishFrame = 0;
 
     function boom(p) {
       if (p.st > 0) return;
@@ -502,6 +558,29 @@ export default function Game() {
         p.yw = Math.atan2(g.x - p.x, g.z - p.z);
       }
       p.p = 0; p.rl = 0; p.sp = 4; p.th = 0.5; p.tp = 0; p.tr = 0; p.wp = null; p.st = 0; p.bt = 0;
+      p.slDraft = 0; p.slTarget = null; p.slBoost = 0;
+    }
+
+    function checkSlipstream(r) {
+      if (r.cr || r.fn) return;
+      let found = false;
+      for (const o of rs) {
+        if (o === r || o.cr || o.fn) continue;
+        const dx2 = r.x - o.x, dy2 = r.y - o.y, dz2 = r.z - o.z;
+        const dist = Math.sqrt(dx2 * dx2 + dy2 * dy2 + dz2 * dz2);
+        if (dist > 60) continue;
+        const bx = -Math.sin(o.yw), bz = -Math.cos(o.yw);
+        const hDist = Math.sqrt(dx2 * dx2 + dz2 * dz2) || 1;
+        const dot = (dx2 * bx + dz2 * bz) / hDist;
+        if (dot > 0 && Math.acos(Math.min(1, dot)) < 40 * D) {
+          r.slDraft++;
+          r.slTarget = o;
+          found = true;
+          if (r.slDraft >= 120) { r.slBoost = 90; r.slDraft = 0; r.slTarget = null; }
+          break;
+        }
+      }
+      if (!found) { r.slDraft = Math.max(0, r.slDraft - 2); r.slTarget = null; }
     }
 
     function checkCol(r) {
@@ -660,7 +739,22 @@ export default function Game() {
         }
         // Passed through successfully
         r.ng++;
-        if (r.ng >= NG) { r.ng = 0; r.lp++; if (r.lp >= LAPS) { r.fn = 1; r.ft = rt; fo.push(r); r.fp = fo.length; } }
+        if (r.ng >= NG) { r.ng = 0; r.lp++; r.scUsed = new Set(); if (r.lp >= LAPS) { r.fn = 1; r.ft = rt; fo.push(r); r.fp = fo.length; } }
+      }
+    }
+
+    function checkBonusGate(r) {
+      if (iB || !bonusGates.length) return;
+      for (const bg of bonusGates) {
+        if (r.scUsed.has(bg.type)) continue;
+        if (r.ng !== bg.gateFrom) continue;
+        const ddx = r.x - bg.x, ddy = r.y - bg.y, ddz = r.z - bg.z;
+        const dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+        if (dist < bg.sz + 18) {
+          r.scUsed.add(bg.type);
+          r.ng += bg.gateskip;
+          if (r.ng >= NG) { r.ng = 0; r.lp++; r.scUsed = new Set(); if (r.lp >= LAPS) { r.fn = 1; r.ft = rt; fo.push(r); r.fp = fo.length; } }
+        }
       }
     }
 
@@ -681,6 +775,22 @@ export default function Game() {
         if (tg.length) { const t = tg.reduce((b, t) => { const d = Math.sqrt((t.x - r.x) ** 2 + (t.z - r.z) ** 2); return d < b.d ? { t, d } : b; }, { t: null, d: Infinity }).t; tx = t.x; ty = t.y; tz = t.z; }
         else { tx = r.x + 100; ty = r.y; tz = r.z; }
       } else { const g = crs[r.ng]; tx = g.x; ty = g.y; tz = g.z; }
+
+      // NPC draft-seeking (race only) — nudge toward drafting position behind nearby racer
+      if (!iB && !r.slBoost) {
+        for (const o of rs) {
+          if (o === r || o.cr || o.fn) continue;
+          const dd = Math.sqrt((o.x - r.x) ** 2 + (o.z - r.z) ** 2);
+          if (dd < 100 && dd > 20) {
+            const oP = o.lp * NG + o.ng, rP = r.lp * NG + r.ng;
+            if (oP >= rP) {
+              const behX = o.x - Math.sin(o.yw) * 40, behZ = o.z - Math.cos(o.yw) * 40;
+              tx = tx * 0.7 + behX * 0.3; tz = tz * 0.7 + behZ * 0.3;
+              break;
+            }
+          }
+        }
+      }
 
       const dx = tx - r.x, dy = ty - r.y, dz = tz - r.z, dH = Math.sqrt(dx * dx + dz * dz);
       const tY = Math.atan2(dx, dz);
@@ -708,9 +818,11 @@ export default function Game() {
       let ts = r.ms * (0.8 + r.ns * 0.2);
       if (r.bt > 0) { ts = r.ms * 1.5; r.bt--; }
       if (r.st > 0) { ts = Math.max(ts, r.ms * 1.4); r.st--; }
+      if (r.slBoost > 0) { ts = Math.max(ts, r.ms * 1.4); r.slBoost--; }
       r.sp += (ts - r.sp) / 40;
 
       const { sy, sp2, cy } = moveRacer(r, 1 / 60);
+      checkSlipstream(r);
 
       // NPC weapon use
       if (r.wp && Math.random() < (iB ? 0.02 : 0.01)) {
@@ -731,6 +843,7 @@ export default function Game() {
 
       if (checkCol(r)) return;
       checkGate(r);
+      checkBonusGate(r);
       getCubes(r);
     }
 
@@ -749,6 +862,7 @@ export default function Game() {
       let ts = 1 + r.th * (r.ms - 1);
       if (r.bt > 0) { ts = r.ms * 1.5; r.bt--; }
       if (r.st > 0) { ts = Math.max(ts, r.ms * 1.4); r.st--; }
+      if (r.slBoost > 0) { ts = Math.max(ts, r.ms * 1.4); r.slBoost--; }
       r.sp += (ts - r.sp) * dt * 2;
 
       const tMulP = r.tumble > 0 ? 0.2 : 1;
@@ -760,6 +874,7 @@ export default function Game() {
       if (r.tumble > 0) r.tumble--;
 
       const { sy, sp2, cy } = moveRacer(r, dt);
+      checkSlipstream(r);
 
       // Fire weapon
       if (ks[fK] && r.wp && !ks["_" + fK]) {
@@ -792,6 +907,7 @@ export default function Game() {
 
       if (checkCol(r)) return;
       checkGate(r);
+      checkBonusGate(r);
       getCubes(r);
 
       const cD = 50 + r.sp * 2, cH = 10 + r.sp * 0.5;
@@ -1276,6 +1392,27 @@ export default function Game() {
         }});
       });
 
+      // Bonus shortcut gates — smaller blue rings
+      if (!iB) bonusGates.forEach(ring => {
+        const p = proj(ring.x, ring.y, ring.z, cam, vh);
+        if (!p || p.d > 600) return;
+        const canUse = vw.ng === ring.gateFrom && !vw.scUsed.has(ring.type);
+        const s = ring.sz * p.sc;
+        if (s < 1.5) return;
+        rn.push({ d: p.d, f() {
+          x.globalAlpha = canUse ? 0.9 : 0.15;
+          x.strokeStyle = canUse ? "rgba(60,150,255,1)" : "rgba(60,150,255,0.2)";
+          x.lineWidth = canUse ? Math.max(2, s * 0.12) : Math.max(1, s * 0.06);
+          if (canUse) { x.shadowColor = "rgba(60,150,255,0.6)"; x.shadowBlur = 10; }
+          x.beginPath(); x.ellipse(p.sx, p.sy, s, s * 0.35, 0, 0, Math.PI * 2); x.stroke();
+          if (canUse) {
+            x.fillStyle = "rgba(60,150,255,0.15)";
+            x.beginPath(); x.ellipse(p.sx, p.sy, s * 0.8, s * 0.28, 0, 0, Math.PI * 2); x.fill();
+          }
+          x.shadowBlur = 0; x.globalAlpha = 1;
+        }});
+      });
+
       // Track rails (left and right lines along gate edges)
       if (!iB && crs.length > 1) {
         x.strokeStyle = "rgba(255,180,50,0.2)";
@@ -1669,6 +1806,25 @@ export default function Game() {
         }
       }
 
+      // Slipstream wind lines — when drafting
+      if (!vw.cr && !vw.fn && vw.slDraft > 30) {
+        const sla = Math.min(0.5, (vw.slDraft - 30) / 90 * 0.5);
+        x.strokeStyle = `rgba(150,200,255,${sla})`; x.lineWidth = 2;
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2 + fc * 0.05;
+          const r1 = vh * 0.35, r2 = r1 - 40 - Math.random() * 30;
+          const sx2 = W / 2 + Math.cos(angle) * r1, sy2 = vh / 2 + Math.sin(angle) * r1;
+          const ex = W / 2 + Math.cos(angle) * r2, ey2 = vh / 2 + Math.sin(angle) * r2;
+          x.beginPath(); x.moveTo(sx2, sy2); x.lineTo(ex, ey2); x.stroke();
+        }
+      }
+      // Slipstream boost — blue tint overlay
+      if (!vw.cr && !vw.fn && vw.slBoost > 0) {
+        const ba = Math.min(0.15, vw.slBoost / 90 * 0.15);
+        x.fillStyle = `rgba(60,130,255,${ba})`;
+        x.fillRect(0, 0, W, vh);
+      }
+
       // Undo screen shake
       if (shakeX || shakeY) { x.translate(-shakeX, -shakeY); }
 
@@ -1693,6 +1849,16 @@ export default function Game() {
         if (sec <= 3) { x.fillStyle = sec === 1 ? "#f97316" : "#fbbf24"; x.font = "bold " + (i2 ? 30 : 48) + "px Georgia"; x.textAlign = "center"; x.fillText(sec, W / 2, vh / 2); x.textAlign = "start"; }
       } else if (started && fc - 240 < 40) {
         x.fillStyle = "#22c55e"; x.font = "bold " + (i2 ? 30 : 48) + "px Georgia"; x.textAlign = "center"; x.fillText("GO!", W / 2, vh / 2); x.textAlign = "start";
+      }
+      // Replay overlay text
+      if (replayMode) {
+        const pulse = 0.6 + Math.sin(fc * 0.08) * 0.4;
+        x.globalAlpha = pulse;
+        x.fillStyle = "#fbbf24"; x.font = "bold " + (i2 ? 18 : 28) + "px Georgia";
+        x.textAlign = "center"; x.fillText("REPLAY", W / 2, 30);
+        x.font = (i2 ? 8 : 11) + "px Georgia"; x.fillStyle = "#94a3b8"; x.globalAlpha = 0.8;
+        x.fillText("Press any key to skip", W / 2, 30 + (i2 ? 14 : 20));
+        x.textAlign = "start"; x.globalAlpha = 1;
       }
       // Tsunami warning — flashing "TSUNAMI!" during first 2 seconds
       if (cr === 3 && tsunami.active && tsunami.progress < 120) {
@@ -1723,6 +1889,47 @@ export default function Game() {
       if (cd > 0) { cd--; fc++; return; }
       if (!started) { started = 1; rs.forEach(r => { r.th = 1; r.sp = iB ? 0 : 0.5; }); }
       rt++;
+
+      // Replay recording — capture positions after first racer finishes
+      if (!iB && !replayMode && fo.length > 0) {
+        if (firstFinishFrame === 0) firstFinishFrame = rt;
+        if (rt % 6 === 0) {
+          replayBuf.push({ racers: rs.map(r => ({ x: r.x, y: r.y, z: r.z, yw: r.yw, p: r.p, rl: r.rl, ac: r.ac, nm: r.nm, cr: r.cr, fn: r.fn })) });
+          if (replayBuf.length > 30) replayBuf.shift();
+        }
+      }
+
+      // Replay playback
+      if (replayMode) {
+        const anyKey = Object.keys(ky.current).some(k => k !== "_pauseCD" && k !== "KeyP" && ky.current[k]);
+        if (anyKey && replayFrame > 10) {
+          setEd({ rs: fo.map((r, i) => ({ nm: r.nm, ac: r.ac, pl: i + 1, t: (r.ft / 60).toFixed(1) })) });
+          setSc("raceEnd"); return;
+        }
+        if (fc % 2 === 0) replayFrame++;
+        if (replayFrame >= replayBuf.length) {
+          setEd({ rs: fo.map((r, i) => ({ nm: r.nm, ac: r.ac, pl: i + 1, t: (r.ft / 60).toFixed(1) })) });
+          setSc("raceEnd"); return;
+        }
+        const snap = replayBuf[replayFrame];
+        if (snap) snap.racers.forEach((s, i) => { if (rs[i]) { rs[i].x = s.x; rs[i].y = s.y; rs[i].z = s.z; rs[i].yw = s.yw; rs[i].p = s.p; rs[i].rl = s.rl; } });
+        // Cinematic camera orbiting the leader
+        const leader = fo[0] || rs[0];
+        const cAng = replayFrame * 0.03;
+        cm[0].x = leader.x + Math.sin(cAng) * 120; cm[0].y = leader.y + 40; cm[0].z = leader.z + Math.cos(cAng) * 120;
+        cm[0].lx = leader.x; cm[0].ly = leader.y; cm[0].lz = leader.z;
+        if (i2) { cm[1].x = cm[0].x; cm[1].y = cm[0].y; cm[1].z = cm[0].z; cm[1].lx = cm[0].lx; cm[1].ly = cm[0].ly; cm[1].lz = cm[0].lz; }
+        // Render but skip normal update
+        const pl2 = rs.filter(r2 => !r2.npc);
+        if (i2) {
+          renderView(cm[0], pl2[0] || rs[0], 0, VH);
+          if (pl2[1]) renderView(cm[1], pl2[1], VH, VH);
+        } else {
+          renderView(cm[0], pl2[0] || rs[0], 0, H);
+        }
+        fc++;
+        return;
+      }
 
       const pl = rs.filter(r => !r.npc);
       if (pl[0]) updatePlayer(pl[0], cm[0], ky.current, "KeyW", "KeyS", "KeyA", "KeyD", "Space", "KeyQ", "Space");
@@ -1890,9 +2097,15 @@ export default function Game() {
           setSc("battleEnd");
         }
       } else {
-        if (rs.every(r => r.fn)) {
-          setEd({ rs: fo.map((r, i) => ({ nm: r.nm, ac: r.ac, pl: i + 1, t: (r.ft / 60).toFixed(1) })) });
-          setSc("raceEnd");
+        const timedOut = firstFinishFrame > 0 && (rt - firstFinishFrame) > 600;
+        if (rs.every(r => r.fn) || timedOut) {
+          if (!replayMode && replayBuf.length > 0) {
+            replayMode = true; replayFrame = 0;
+            rs.forEach(r => { if (!r.fn) { r.fn = 1; r.ft = rt; fo.push(r); r.fp = fo.length; } });
+          } else if (!replayMode) {
+            setEd({ rs: fo.map((r, i) => ({ nm: r.nm, ac: r.ac, pl: i + 1, t: (r.ft / 60).toFixed(1) })) });
+            setSc("raceEnd");
+          }
         }
       }
 
