@@ -238,7 +238,7 @@ export default function Game() {
           const dx = g2.x - g1.x, dz = g2.z - g1.z;
           const len = Math.sqrt(dx * dx + dz * dz) || 1;
           const px = -dz / len, pz = dx / len;
-          const off = 120 + (Math.random() - 0.5) * 30;
+          const off = 140 + (Math.random() - 0.5) * 8;
           const ht = 250 + Math.sin(ord * 0.3) * 50;
           const w = 45 + Math.random() * 10;
           const lx = cx + px * off, lz = cz + pz * off;
@@ -249,6 +249,16 @@ export default function Game() {
           canyonL.push(lw); canyonR.push(rw);
           ord++;
         }
+      }
+      // Smoothing passes — average positions and heights with neighbors (2 passes)
+      for (let pass = 0; pass < 2; pass++) {
+        [canyonL, canyonR].forEach(side => {
+          for (let i = 1; i < side.length - 1; i++) {
+            side[i].x = (side[i - 1].x + side[i].x + side[i + 1].x) / 3;
+            side[i].z = (side[i - 1].z + side[i].z + side[i + 1].z) / 3;
+            side[i].ht = (side[i - 1].ht + side[i].ht + side[i + 1].ht) / 3;
+          }
+        });
       }
     }
     // Extra powerup rings inside the canyon (Course 0 only)
@@ -285,6 +295,37 @@ export default function Game() {
           br.push({ x: mx, y: my, z: mz, sz: 25, cl: 0, rt: 0 });
         }
       }
+    }
+
+    // Flight path safety cleanup — remove terrain objects too close to gates or the path between them
+    if (!iB && crs.length > 1) {
+      const clearR = 80;
+      // Collect all clearance points: gates + 4 midpoints between each consecutive gate pair
+      const clearPts = [];
+      crs.forEach(g => clearPts.push({ x: g.x, z: g.z }));
+      for (let i = 0; i < NG; i++) {
+        const g1 = crs[i], g2 = crs[(i + 1) % NG];
+        for (let t = 0.2; t <= 0.8; t += 0.2) {
+          clearPts.push({ x: g1.x + (g2.x - g1.x) * t, z: g1.z + (g2.z - g1.z) * t });
+        }
+      }
+      function tooClose(obj) {
+        for (const pt of clearPts) {
+          if (Math.sqrt((obj.x - pt.x) ** 2 + (obj.z - pt.z) ** 2) < clearR) return true;
+        }
+        return false;
+      }
+      // Filter mountains/pillars
+      for (let i = mts.length - 1; i >= 0; i--) { if (tooClose(mts[i])) mts.splice(i, 1); }
+      // Filter floating islands
+      for (let i = islands.length - 1; i >= 0; i--) { if (tooClose(islands[i])) islands.splice(i, 1); }
+      // Filter canyon walls
+      for (let i = canyon.length - 1; i >= 0; i--) { if (tooClose(canyon[i])) canyon.splice(i, 1); }
+      // Rebuild canyonL/canyonR after cleanup
+      canyonL.length = 0; canyonR.length = 0;
+      canyon.forEach(c => { if (c.side === 0) canyonL.push(c); else canyonR.push(c); });
+      // Filter ships
+      for (let i = ships.length - 1; i >= 0; i--) { if (tooClose(ships[i])) ships.splice(i, 1); }
     }
 
     // Racers
@@ -800,7 +841,7 @@ export default function Game() {
       // Course gates
       if (!iB) crs.forEach((ring, idx) => {
         const p = proj(ring.x, ring.y, ring.z, cam, vh);
-        if (!p || p.d > 400) return;
+        if (!p || p.d > 800) return;
         const s = ring.sz * p.sc;
         if (s < 2) return;
         const isN = idx === vw.ng;
@@ -840,7 +881,7 @@ export default function Game() {
       br.forEach(b => {
         if (b.cl) return;
         const p = proj(b.x, b.y, b.z, cam, vh);
-        if (!p || p.d > 300) return;
+        if (!p || p.d > 600) return;
         const s = b.sz * p.sc;
         if (s < 2) return;
         rn.push({ d: p.d, f() {
