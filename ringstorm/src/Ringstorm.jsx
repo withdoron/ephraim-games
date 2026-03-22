@@ -365,12 +365,13 @@ export default function Game() {
         th: 0, tp: 0, tr: 0, wp: null, wt: 0, st: 0, bt: 0,
         cr: 0, ct: 0, cx: 0, cy: 0, cz: 0, ep: [],
         ng: 0, lp: 0, fn: 0, ft: 0, fp: 0, hf: 0,
-        nw: Math.random() * 6, ns: 0.7 + Math.random() * 0.3, lv: 3, kl: 0, zap: 0,
+        nw: Math.random() * 6, ns: 0.7 + Math.random() * 0.3, lv: 3, kl: 0, zap: 0, tumble: 0,
       };
     });
 
     const cm = rs.filter(r => !r.npc).map(r => ({ x: r.x, y: r.y + 20, z: r.z - 50, lx: r.x, ly: r.y, lz: r.z }));
     let pj = [], storms = [], fc = 0, cd = 240, started = 0, rt = 0, fo = [];
+    let tsunami = { active: false, triggered: false, angle: 0, progress: 0, duration: 420, spray: [] };
 
     function boom(p) {
       if (p.st > 0) return;
@@ -546,11 +547,18 @@ export default function Game() {
       while (yd > Math.PI) yd -= Math.PI * 2;
       while (yd < -Math.PI) yd += Math.PI * 2;
 
-      r.tr = -Math.max(-50 * D, Math.min(50 * D, yd * 2.5));
+      const tMul = r.tumble > 0 ? 0.2 : 1;
+      r.tr = -Math.max(-50 * D, Math.min(50 * D, yd * 2.5)) * tMul;
       r.rl += (r.tr - r.rl) / 18;
       r.yw += (-r.rl * 2.2 * (r.sp / r.ms)) / 60;
-      r.tp = Math.max(-15 * D, Math.min(15 * D, (dy / Math.max(50, dH)) * 40 * D));
+      // NPC tsunami awareness: gain altitude during warning
+      if (cr === 3 && tsunami.active && tsunami.progress < 120 && !r.cr) {
+        r.tp = 20 * D; // pitch up to fly over the wave
+      } else {
+        r.tp = Math.max(-15 * D, Math.min(15 * D, (dy / Math.max(50, dH)) * 40 * D)) * tMul;
+      }
       r.p += (r.tp - r.p) / 24;
+      if (r.tumble > 0) r.tumble--;
 
       let ts = r.ms * (0.8 + r.ns * 0.2);
       if (r.bt > 0) { ts = r.ms * 1.5; r.bt--; }
@@ -598,11 +606,13 @@ export default function Game() {
       if (r.st > 0) { ts = Math.max(ts, r.ms * 1.4); r.st--; }
       r.sp += (ts - r.sp) * dt * 2;
 
-      if (ks[lK]) r.tr = 50 * D; else if (ks[rK]) r.tr = -50 * D; else r.tr = 0;
-      if (ks[uK]) r.tp = 25 * D; else if (ks[dK]) r.tp = -20 * D; else r.tp *= 0.9;
+      const tMulP = r.tumble > 0 ? 0.2 : 1;
+      if (ks[lK]) r.tr = 50 * D * tMulP; else if (ks[rK]) r.tr = -50 * D * tMulP; else r.tr = 0;
+      if (ks[uK]) r.tp = 25 * D * tMulP; else if (ks[dK]) r.tp = -20 * D * tMulP; else r.tp *= 0.9;
       r.rl += (r.tr - r.rl) * dt * 4;
       r.p += (r.tp - r.p) * dt * 3;
       r.yw += (-r.rl * 2.2 * (r.sp / r.ms)) * dt;
+      if (r.tumble > 0) r.tumble--;
 
       const { sy, sp2, cy } = moveRacer(r, dt);
 
@@ -1243,6 +1253,69 @@ export default function Game() {
         }
       });
 
+      // Tsunami wave (Ocean Run only)
+      if (cr === 3 && tsunami.active) {
+        const wDir = { x: Math.cos(tsunami.angle), z: Math.sin(tsunami.angle) };
+        const pDir = { x: -Math.sin(tsunami.angle), z: Math.cos(tsunami.angle) };
+        const wFront = -1500 + tsunami.progress * 8;
+        // Sample 20 points along the wave front
+        const pts = 20, halfW = 2000;
+        const topPts = [], botPts = [];
+        let avgD = 0, validCount = 0;
+        for (let i = 0; i <= pts; i++) {
+          const t = (i / pts - 0.5) * 2; // -1 to 1
+          const perpOff = t * halfW;
+          const baseX = wDir.x * wFront + pDir.x * perpOff;
+          const baseZ = wDir.z * wFront + pDir.z * perpOff;
+          const perpNorm = Math.abs(t);
+          const waveH = 120 * (1 - perpNorm * 0.5); // 120 at center, 60 at edges
+          const pBot = proj(baseX, -25, baseZ, cam, vh);
+          const pTop = proj(baseX, -25 + waveH, baseZ, cam, vh);
+          if (pBot && pTop) {
+            topPts.push(pTop); botPts.push(pBot);
+            avgD += pBot.d; validCount++;
+          }
+        }
+        if (validCount > 2) {
+          avgD /= validCount;
+          rn.push({ d: avgD, f() {
+            // Main wave body
+            x.globalAlpha = 0.8;
+            x.fillStyle = "rgb(15,80,110)";
+            x.beginPath();
+            x.moveTo(botPts[0].sx, botPts[0].sy);
+            topPts.forEach(p => x.lineTo(p.sx, p.sy));
+            for (let i = botPts.length - 1; i >= 0; i--) x.lineTo(botPts[i].sx, botPts[i].sy);
+            x.closePath(); x.fill();
+            // Front face highlight
+            x.fillStyle = "rgb(30,110,140)";
+            x.globalAlpha = 0.6;
+            x.beginPath();
+            topPts.forEach((p, i) => { const b = botPts[i]; if (i === 0) x.moveTo(p.sx, p.sy); else x.lineTo(p.sx, p.sy); });
+            for (let i = topPts.length - 1; i >= 0; i--) {
+              const t2 = topPts[i], b = botPts[i];
+              x.lineTo(t2.sx + (b.sx - t2.sx) * 0.3, t2.sy + (b.sy - t2.sy) * 0.3);
+            }
+            x.closePath(); x.fill();
+            // White foam crest
+            x.strokeStyle = "rgb(220,240,250)"; x.lineWidth = 3; x.globalAlpha = 0.9;
+            x.beginPath();
+            topPts.forEach((p, i) => { if (i === 0) x.moveTo(p.sx, p.sy); else x.lineTo(p.sx, p.sy); });
+            x.stroke();
+            // Spray particles
+            x.fillStyle = "rgba(220,240,250,0.7)";
+            tsunami.spray.forEach(sp => {
+              const spX = wDir.x * wFront + pDir.x * sp.ox;
+              const spZ = wDir.z * wFront + pDir.z * sp.ox;
+              const spY = -25 + 90 + sp.oy + sp.life * 0.5;
+              const pp = proj(spX, spY, spZ, cam, vh);
+              if (pp) { x.beginPath(); x.arc(pp.sx, pp.sy, Math.max(1, 3 * pp.sc), 0, Math.PI * 2); x.fill(); }
+            });
+            x.globalAlpha = 1;
+          }});
+        }
+      }
+
       // Shadow under player plane
       if (!vw.cr && !vw.fn) {
         const shY = gH(vw.x, vw.z);
@@ -1380,6 +1453,14 @@ export default function Game() {
       } else if (started && fc - 240 < 40) {
         x.fillStyle = "#22c55e"; x.font = "bold " + (i2 ? 30 : 48) + "px Georgia"; x.textAlign = "center"; x.fillText("GO!", W / 2, vh / 2); x.textAlign = "start";
       }
+      // Tsunami warning — flashing "TSUNAMI!" during first 2 seconds
+      if (cr === 3 && tsunami.active && tsunami.progress < 120) {
+        const pulse = 0.5 + Math.sin(fc * 0.15) * 0.5;
+        x.globalAlpha = pulse;
+        x.fillStyle = "#f97316"; x.font = "bold " + (i2 ? 24 : 40) + "px Georgia";
+        x.textAlign = "center"; x.fillText("🌊 TSUNAMI!", W / 2, vh * 0.35);
+        x.textAlign = "start"; x.globalAlpha = 1;
+      }
       x.restore();
     }
 
@@ -1455,6 +1536,58 @@ export default function Game() {
       storms = storms.filter(st => st.timer > 0);
       // Apply zap slowdown
       rs.forEach(r => { if (r.zap > 0) { r.sp = Math.min(r.sp, 1); r.zap--; } });
+
+      // Tsunami — Ocean Run (cr===3) only, triggers on lap 2
+      if (cr === 3 && !iB) {
+        // Trigger check: any racer starts lap 2
+        if (!tsunami.triggered) {
+          for (const r of rs) {
+            if (r.lp >= 1) {
+              tsunami.active = true;
+              tsunami.triggered = true;
+              tsunami.progress = 0;
+              tsunami.angle = Math.random() * Math.PI * 2;
+              // Init spray particles
+              tsunami.spray = [];
+              for (let i = 0; i < 10; i++) tsunami.spray.push({ ox: (Math.random() - 0.5) * 3000, oy: Math.random() * 20, life: 0 });
+              break;
+            }
+          }
+        }
+        // Update tsunami
+        if (tsunami.active) {
+          tsunami.progress++;
+          if (tsunami.progress >= tsunami.duration) { tsunami.active = false; }
+          else {
+            // Wave front position along travel direction
+            const wDir = { x: Math.cos(tsunami.angle), z: Math.sin(tsunami.angle) };
+            const wFront = -1500 + tsunami.progress * 8;
+            // Check each racer
+            rs.forEach(r => {
+              if (r.cr || r.fn) return;
+              if (r.st > 0) return; // star immunity
+              // Racer's position along wave travel axis
+              const rAlong = r.x * wDir.x + r.z * wDir.z;
+              const distToFront = Math.abs(rAlong - wFront);
+              if (distToFront < 40) {
+                // Wave height at racer's perpendicular position
+                const rPerp = -r.x * wDir.z + r.z * wDir.x;
+                const perpNorm = Math.abs(rPerp) / 2000;
+                const waveH = 80 + (1 - Math.min(1, perpNorm)) * 40;
+                if (r.y < -25 + waveH) {
+                  // Hit by tsunami — push and tumble
+                  r.x += wDir.x * 4;
+                  r.z += wDir.z * 4;
+                  r.sp = 1;
+                  if (r.tumble <= 0) r.tumble = 60;
+                }
+              }
+            });
+            // Update spray particles
+            tsunami.spray.forEach(sp => { sp.life++; if (sp.life > 40) { sp.ox = (Math.random() - 0.5) * 3000; sp.oy = Math.random() * 20; sp.life = 0; } });
+          }
+        }
+      }
 
       // End conditions
       if (iB) {
