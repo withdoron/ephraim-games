@@ -256,13 +256,13 @@ export default function Game() {
         });
       }
     }
-    // Generate mystery cube stations — race: 1 station per gate pair, battle: 8 stations in circle
+    // Generate mystery cube stations — race: 1 station per gate pair, battle: 4 stations (N/S/E/W)
     if (iB) {
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2, r = 250;
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2, r = 250;
         const cx = Math.cos(a) * r, cz = Math.sin(a) * r, cy = 200;
         const px = -Math.sin(a), pz = Math.cos(a);
-        for (const off of [-25, 0, 25]) {
+        for (const off of [-20, 20]) {
           cubes.push({ x: cx + px * off, y: cy, z: cz + pz * off, active: true, rt: 0 });
         }
       }
