@@ -384,14 +384,49 @@ export default function Game() {
       return 0;
     }
 
+    // Rubber banding — position-based item weights
+    function getRacePos(racer) {
+      if (iB) {
+        const alive = rs.filter(r2 => !r2.fn);
+        const sorted = [...alive].sort((a, b) => b.lv - a.lv || b.kl - a.kl);
+        const idx = sorted.indexOf(racer);
+        return idx >= 0 ? idx + 1 : alive.length;
+      }
+      const active = rs.filter(r2 => !r2.fn);
+      const sorted = [...active].sort((a, b) => (b.lp * NG + b.ng) - (a.lp * NG + a.ng));
+      const idx = sorted.indexOf(racer);
+      const ahead = fo.filter(r2 => r2 !== racer).length;
+      return (idx >= 0 ? idx + 1 : active.length) + ahead;
+    }
+
+    function weightedRandom(weights) {
+      const total = weights.reduce((s, w) => s + w.weight, 0);
+      let r = Math.random() * total;
+      for (const w of weights) { r -= w.weight; if (r <= 0) return w.id; }
+      return weights[weights.length - 1].id;
+    }
+
+    const W_FIRST = [{id:"gun",weight:40},{id:"boost",weight:40},{id:"missile",weight:15},{id:"star",weight:3},{id:"flares",weight:2}];
+    const W_MID   = [{id:"gun",weight:20},{id:"boost",weight:25},{id:"missile",weight:30},{id:"star",weight:10},{id:"flares",weight:15}];
+    const W_LAST  = [{id:"gun",weight:5},{id:"boost",weight:15},{id:"missile",weight:30},{id:"star",weight:35},{id:"flares",weight:15}];
+
+    function getItemForPos(racer) {
+      const pos = getRacePos(racer);
+      const total = rs.filter(r2 => !r2.fn).length + fo.length;
+      let tier;
+      if (total <= 2) { tier = pos === 1 ? W_FIRST : W_LAST; }
+      else { const lastStart = Math.max(2, total - 1); tier = pos <= 1 ? W_FIRST : pos >= lastStart ? W_LAST : W_MID; }
+      return weightedRandom(tier);
+    }
+
     function getCubes(r) {
       cubes.forEach(c => {
         if (!c.active) return;
         if (Math.sqrt((r.x - c.x) ** 2 + (r.y - c.y) ** 2 + (r.z - c.z) ** 2) < 20) {
           c.active = false; c.rt = 300;
           if (r.wp === null) {
-            const pw = PW[Math.floor(Math.random() * PW.length)];
-            r.wp = pw.id; r.wt = pw.id === "gun" ? 8 : 0;
+            const id = getItemForPos(r);
+            r.wp = id; r.wt = id === "gun" ? 8 : 0;
           }
         }
       });
