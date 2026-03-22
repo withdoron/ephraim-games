@@ -50,10 +50,13 @@ export default function Game() {
       crs[4].y = 300; crs[5].y = 180;
     }
     if (!iB && cr === 3 && crs.length >= NG) {
-      // Ocean Run: wave skimming section
-      crs[0].y = 80; crs[1].y = 80;
-      crs[2].y = 40; crs[3].y = 45;
-      crs[4].y = 80; crs[5].y = 80;
+      // Ocean Run: wave skimming + low gates through arches at 1, 3, 5
+      crs[0].y = 80;
+      crs[1].y = 30; // through arch — low
+      crs[2].y = 40;
+      crs[3].y = 35; // through arch — low
+      crs[4].y = 80;
+      crs[5].y = 30; // through arch — low
     }
 
     // Mystery cubes — row of 4 cubes halfway between each gate pair
@@ -256,8 +259,8 @@ export default function Game() {
         tunnels.push(sections);
         // Tunnel mountain — placed at midpoint of the tunnel
         const midSec = sections[Math.floor(sections.length / 2)];
-        const tmW = 120 + Math.random() * 30;
-        const tmHt = 160 + Math.random() * 40;
+        const tmW = 100 + Math.random() * 30;
+        const tmHt = 180 + Math.random() * 40;
         const tm = { x: midSec.cx, z: midSec.cz, bY: gH(midSec.cx, midSec.cz), ht: tmHt, w: tmW, icy: 1, tunnelMt: true, tunnelBaseY: midSec.baseY, tunnelTopY: midSec.ceilY };
         mts.push(tm);
         tunnelMts.push(tm);
@@ -520,10 +523,19 @@ export default function Game() {
       for (const ar of arches) {
         // Left pillar collision
         const dL = Math.sqrt((r.x - ar.lx) ** 2 + (r.z - ar.lz) ** 2);
-        if (dL < 15 && r.y > ar.y && r.y < ar.y + ar.ht) { boom(r); return 1; }
+        if (dL < ar.w * 0.7 && r.y > ar.y && r.y < ar.y + ar.ht) { boom(r); return 1; }
         // Right pillar collision
         const dR = Math.sqrt((r.x - ar.rx) ** 2 + (r.z - ar.rz) ** 2);
-        if (dR < 15 && r.y > ar.y && r.y < ar.y + ar.ht) { boom(r); return 1; }
+        if (dR < ar.w * 0.7 && r.y > ar.y && r.y < ar.y + ar.ht) { boom(r); return 1; }
+        // Beam collision — if between pillars horizontally and at beam height, crash
+        const archMx = (ar.lx + ar.rx) / 2, archMz = (ar.lz + ar.rz) / 2;
+        const archDx = ar.rx - ar.lx, archDz = ar.rz - ar.lz;
+        const archLen = Math.sqrt(archDx * archDx + archDz * archDz) || 1;
+        const toRx = r.x - ar.lx, toRz = r.z - ar.lz;
+        const along2 = (toRx * archDx + toRz * archDz) / archLen;
+        const perpDist = Math.abs(toRx * (-archDz / archLen) + toRz * (archDx / archLen));
+        const beamThick = 10;
+        if (along2 > 0 && along2 < archLen && perpDist < ar.w * 0.6 && r.y > ar.y + ar.ht - beamThick && r.y < ar.y + ar.ht + 5) { boom(r); return 1; }
       }
       // Tunnel collision (Ice Cavern)
       for (const secs of tunnels) {
@@ -910,36 +922,65 @@ export default function Game() {
         const dist = Math.sqrt((m.x - vw.x) ** 2 + (m.z - vw.z) ** 2);
         if (dist > 1800) return;
         const al = Math.max(0.3, 1 - dist / 1800);
+        // Tunnel mountains: skip exterior faces when player is inside (close + at tunnel altitude)
+        const insideTunnel = m.tunnelMt && dist < 120 && vw.y >= m.tunnelBaseY - 10 && vw.y <= m.tunnelTopY + 10;
         const pP = proj(m.x, m.bY + m.ht, m.z, cam, vh);
         const pL = proj(m.x - m.w, m.bY, m.z, cam, vh);
         const pR = proj(m.x + m.w, m.bY, m.z, cam, vh);
         const pF = proj(m.x, m.bY, m.z - m.w, cam, vh);
         const pB = proj(m.x, m.bY, m.z + m.w, cam, vh);
         if (!pP) return;
-        [[pL, pF, 0.6], [pF, pR, 0.8], [pR, pB, 0.5], [pB, pL, 0.4]].forEach(([a, b, sh]) => {
-          if (!a || !b) return;
-          rn.push({ d: (a.d + pP.d) / 2, f() {
-            x.globalAlpha = al;
-            if (m.icy) {
-              x.globalAlpha = al * 0.8;
-              x.fillStyle = `rgb(${140 * sh + 40 | 0},${170 * sh + 30 | 0},${200 * sh + 20 | 0})`;
-            } else if (m.volcanic) {
-              x.fillStyle = `rgb(${50 * sh + 15 | 0},${40 * sh + 12 | 0},${35 * sh + 10 | 0})`;
-            } else {
-              x.fillStyle = `rgb(${70 * sh + 30 | 0},${60 * sh + 25 | 0},${50 * sh + 20 | 0})`;
-            }
-            x.beginPath(); x.moveTo(a.sx, a.sy); x.lineTo(pP.sx, pP.sy); x.lineTo(b.sx, b.sy); x.closePath(); x.fill();
-            // Edge stroke for definition
-            x.strokeStyle = "rgba(0,0,0,0.12)"; x.lineWidth = 0.5;
-            x.beginPath(); x.moveTo(a.sx, a.sy); x.lineTo(pP.sx, pP.sy); x.lineTo(b.sx, b.sy); x.closePath(); x.stroke();
-            if (!m.volcanic && !m.icy) {
-              x.fillStyle = `rgb(${200 * sh + 40 | 0},${200 * sh + 40 | 0},${210 * sh + 30 | 0})`;
-              const sY = m.bY + m.ht * 0.7;
-              const sA = proj((a.sx === pL?.sx ? m.x - m.w / 2 : a.sx === pF?.sx ? m.x : a.sx === pR?.sx ? m.x + m.w / 2 : m.x), sY, (a.sx === pL?.sx ? m.z : a.sx === pF?.sx ? m.z - m.w / 2 : a.sx === pR?.sx ? m.z : m.z + m.w / 2), cam, vh);
-            }
-            x.globalAlpha = 1;
-          }});
-        });
+        if (!insideTunnel) {
+          const iceFaceColors = [[130,155,185],[110,140,175],[100,130,165],[150,170,200]];
+          [[pL, pF, 0.6, 0], [pF, pR, 0.8, 1], [pR, pB, 0.5, 2], [pB, pL, 0.4, 3]].forEach(([a, b, sh, fi]) => {
+            if (!a || !b) return;
+            rn.push({ d: (a.d + pP.d) / 2, f() {
+              x.globalAlpha = al;
+              if (m.icy) {
+                const ic = iceFaceColors[fi];
+                x.fillStyle = `rgb(${ic[0] * sh + 40 | 0},${ic[1] * sh + 30 | 0},${ic[2] * sh + 20 | 0})`;
+              } else if (m.volcanic) {
+                x.fillStyle = `rgb(${50 * sh + 15 | 0},${40 * sh + 12 | 0},${35 * sh + 10 | 0})`;
+              } else {
+                x.fillStyle = `rgb(${70 * sh + 30 | 0},${60 * sh + 25 | 0},${50 * sh + 20 | 0})`;
+              }
+              x.beginPath(); x.moveTo(a.sx, a.sy); x.lineTo(pP.sx, pP.sy); x.lineTo(b.sx, b.sy); x.closePath(); x.fill();
+              x.strokeStyle = "rgba(0,0,0,0.12)"; x.lineWidth = 0.5;
+              x.beginPath(); x.moveTo(a.sx, a.sy); x.lineTo(pP.sx, pP.sy); x.lineTo(b.sx, b.sy); x.closePath(); x.stroke();
+              // Snow cap — icy at 60% height, regular at 70%
+              if (!m.volcanic) {
+                const capStart = m.icy ? 0.6 : 0.7;
+                x.fillStyle = m.icy ? `rgb(${210 * sh + 30 | 0},${225 * sh + 20 | 0},${240 * sh + 10 | 0})` : `rgb(${200 * sh + 40 | 0},${200 * sh + 40 | 0},${210 * sh + 30 | 0})`;
+                const sY = m.bY + m.ht * capStart;
+                const frac = 1 - capStart;
+                const aX = a.sx + (pP.sx - a.sx) * capStart, aY2 = a.sy + (pP.sy - a.sy) * capStart;
+                const bX = b.sx + (pP.sx - b.sx) * capStart, bY2 = b.sy + (pP.sy - b.sy) * capStart;
+                x.beginPath(); x.moveTo(aX, aY2); x.lineTo(pP.sx, pP.sy); x.lineTo(bX, bY2); x.closePath(); x.fill();
+              }
+              x.globalAlpha = 1;
+            }});
+          });
+        }
+        // Tunnel mountain entrances — dark openings visible from far
+        if (m.tunnelMt && m.entrances) {
+          m.entrances.forEach(en => {
+            const enDist = Math.sqrt((en.x - vw.x) ** 2 + (en.z - vw.z) ** 2);
+            if (enDist > 600) return;
+            const p = proj(en.x, en.y, en.z, cam, vh);
+            if (!p) return;
+            rn.push({ d: p.d - 0.5, f() {
+              const rW2 = Math.max(4, en.rW * p.sc);
+              const rH2 = Math.max(3, en.rH * p.sc);
+              x.save();
+              x.fillStyle = "rgb(25,30,40)";
+              x.beginPath(); x.ellipse(p.sx, p.sy, rW2, rH2, 0, 0, Math.PI * 2); x.fill();
+              x.strokeStyle = "rgba(160,200,230,0.6)";
+              x.lineWidth = Math.max(1, 2.5 * p.sc);
+              x.beginPath(); x.ellipse(p.sx, p.sy, rW2 + 2, rH2 + 2, 0, 0, Math.PI * 2); x.stroke();
+              x.restore();
+            }});
+          });
+        }
       });
 
       // Floating islands (Course 1) — solid connected 3D shapes
@@ -1022,7 +1063,6 @@ export default function Game() {
         const midX = (ar.lx + ar.rx) / 2, midZ = (ar.lz + ar.rz) / 2;
         const dist = Math.sqrt((midX - vw.x) ** 2 + (midZ - vw.z) ** 2);
         if (dist > 800) return;
-        const al = Math.max(0.3, 1 - dist / 800);
         const pLB = proj(ar.lx, ar.y, ar.lz, cam, vh);
         const pLT = proj(ar.lx, ar.y + ar.ht, ar.lz, cam, vh);
         const pRB = proj(ar.rx, ar.y, ar.rz, cam, vh);
@@ -1030,7 +1070,7 @@ export default function Game() {
         if (!pLB || !pLT || !pRB || !pRT) return;
         const avgD = (pLB.d + pRB.d) / 2;
         rn.push({ d: avgD, f() {
-          x.globalAlpha = al;
+          x.globalAlpha = 1;
           const lwB = Math.max(6, ar.w * pLB.sc); // base width
           const lwT = lwB * 0.6; // top width (tapered)
           const rwB = Math.max(6, ar.w * pRB.sc);
@@ -1171,48 +1211,48 @@ export default function Game() {
         }
       });
 
-      // Ice tunnels (Course 5)
+      // Ice tunnel interiors (Course 5) — dark walls/ceiling visible when inside
       if (cr === 5) {
         tunnels.forEach(secs => {
           for (let i = 0; i < secs.length - 1; i++) {
             const a = secs[i], b2 = secs[i + 1];
             const mx = (a.cx + b2.cx) / 2, mz = (a.cz + b2.cz) / 2;
             const dist = Math.sqrt((mx - vw.x) ** 2 + (mz - vw.z) ** 2);
-            if (dist > 600) continue;
-            const al = Math.max(0.3, 1 - dist / 600);
-            // Left wall
+            if (dist > 300) continue; // Only render interior when close
+            const al = Math.max(0.4, 1 - dist / 300);
+            // Left wall — dark ice interior
             const pLB_a = proj(a.lx, a.baseY, a.lz, cam, vh);
-            const pLT_a = proj(a.lx, a.topY, a.lz, cam, vh);
+            const pLT_a = proj(a.lx, a.ceilY, a.lz, cam, vh);
             const pLB_b = proj(b2.lx, b2.baseY, b2.lz, cam, vh);
-            const pLT_b = proj(b2.lx, b2.topY, b2.lz, cam, vh);
+            const pLT_b = proj(b2.lx, b2.ceilY, b2.lz, cam, vh);
             if (pLB_a && pLT_a && pLB_b && pLT_b) {
               rn.push({ d: (pLB_a.d + pLB_b.d) / 2, f() {
-                x.globalAlpha = al * 0.85;
-                x.fillStyle = "rgb(140,170,200)";
+                x.globalAlpha = al * 0.9;
+                x.fillStyle = "rgb(50,65,85)";
                 x.beginPath(); x.moveTo(pLB_a.sx, pLB_a.sy); x.lineTo(pLT_a.sx, pLT_a.sy);
                 x.lineTo(pLT_b.sx, pLT_b.sy); x.lineTo(pLB_b.sx, pLB_b.sy); x.closePath(); x.fill();
                 x.globalAlpha = 1;
               }});
             }
-            // Right wall
+            // Right wall — dark ice interior
             const pRB_a = proj(a.rx, a.baseY, a.rz, cam, vh);
-            const pRT_a = proj(a.rx, a.topY, a.rz, cam, vh);
+            const pRT_a = proj(a.rx, a.ceilY, a.rz, cam, vh);
             const pRB_b = proj(b2.rx, b2.baseY, b2.rz, cam, vh);
-            const pRT_b = proj(b2.rx, b2.topY, b2.rz, cam, vh);
+            const pRT_b = proj(b2.rx, b2.ceilY, b2.rz, cam, vh);
             if (pRB_a && pRT_a && pRB_b && pRT_b) {
               rn.push({ d: (pRB_a.d + pRB_b.d) / 2, f() {
-                x.globalAlpha = al * 0.85;
-                x.fillStyle = "rgb(120,150,185)";
+                x.globalAlpha = al * 0.9;
+                x.fillStyle = "rgb(50,65,85)";
                 x.beginPath(); x.moveTo(pRB_a.sx, pRB_a.sy); x.lineTo(pRT_a.sx, pRT_a.sy);
                 x.lineTo(pRT_b.sx, pRT_b.sy); x.lineTo(pRB_b.sx, pRB_b.sy); x.closePath(); x.fill();
                 x.globalAlpha = 1;
               }});
             }
-            // Ceiling
+            // Ceiling — slightly lighter dark ice
             if (pLT_a && pRT_a && pLT_b && pRT_b) {
               rn.push({ d: (pLT_a.d + pRT_a.d) / 2 - 1, f() {
-                x.globalAlpha = al * 0.7;
-                x.fillStyle = "rgb(170,195,220)";
+                x.globalAlpha = al * 0.85;
+                x.fillStyle = "rgb(60,75,95)";
                 x.beginPath(); x.moveTo(pLT_a.sx, pLT_a.sy); x.lineTo(pRT_a.sx, pRT_a.sy);
                 x.lineTo(pRT_b.sx, pRT_b.sy); x.lineTo(pLT_b.sx, pLT_b.sy); x.closePath(); x.fill();
                 x.globalAlpha = 1;
@@ -1237,34 +1277,11 @@ export default function Game() {
             x.beginPath(); x.moveTo(pT.sx - wTop, pT.sy); x.lineTo(pT.sx + wTop, pT.sy);
             x.lineTo(pB.sx + wBot, pB.sy); x.lineTo(pB.sx - wBot, pB.sy); x.closePath(); x.fill();
             x.shadowBlur = 0;
-            // White highlight streak
             x.strokeStyle = "rgba(255,255,255,0.5)";
             x.lineWidth = Math.max(1, wTop * 0.3);
             x.beginPath(); x.moveTo(pT.sx - wTop * 0.3, pT.sy + 2); x.lineTo(pB.sx, pB.sy - 2); x.stroke();
             x.restore();
           }});
-        });
-        // Tunnel entrance dark openings on mountain faces
-        tunnelMts.forEach(tm => {
-          if (!tm.entrances) return;
-          tm.entrances.forEach(en => {
-            const dist = Math.sqrt((en.x - vw.x) ** 2 + (en.z - vw.z) ** 2);
-            if (dist > 500) return;
-            const p = proj(en.x, en.y, en.z, cam, vh);
-            if (!p) return;
-            rn.push({ d: p.d - 0.5, f() {
-              const rW = Math.max(3, en.rW * p.sc);
-              const rH = Math.max(2, en.rH * p.sc);
-              x.save();
-              x.fillStyle = "rgba(15,20,35,0.9)";
-              x.beginPath(); x.ellipse(p.sx, p.sy, rW, rH, 0, 0, Math.PI * 2); x.fill();
-              // Subtle ice rim around opening
-              x.strokeStyle = "rgba(160,200,230,0.5)";
-              x.lineWidth = Math.max(1, 2 * p.sc);
-              x.beginPath(); x.ellipse(p.sx, p.sy, rW + 1, rH + 1, 0, 0, Math.PI * 2); x.stroke();
-              x.restore();
-            }});
-          });
         });
       }
 
