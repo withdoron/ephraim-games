@@ -329,7 +329,7 @@ export default function Game() {
       return {
         ...d, x: sp.x + Math.cos(sd + Math.PI / 2) * ox + Math.sin(sd) * oz,
         y: sp.y + 10, z: sp.z + Math.sin(sd + Math.PI / 2) * ox + Math.cos(sd) * oz,
-        p: 0, yw: sd, rl: 0, sp: 0, ms: d.npc ? 5.5 + Math.random() * 1 : 6,
+        p: 0, yw: sd, rl: 0, sp: 0, ms: d.npc ? 3.7 + Math.random() * 0.7 : 4,
         th: 0, tp: 0, tr: 0, wp: null, wt: 0, st: 0, bt: 0,
         cr: 0, ct: 0, cx: 0, cy: 0, cz: 0, ep: [],
         ng: 0, lp: 0, fn: 0, ft: 0, fp: 0, hf: 0,
@@ -473,8 +473,8 @@ export default function Game() {
       r.p += (r.tp - r.p) / 24;
 
       let ts = r.ms * (0.8 + r.ns * 0.2);
-      if (r.bt > 0) { ts = r.ms * 1.25; r.bt--; }
-      if (r.st > 0) { ts = Math.max(ts, r.ms * 1.2); r.st--; }
+      if (r.bt > 0) { ts = r.ms * 1.5; r.bt--; }
+      if (r.st > 0) { ts = Math.max(ts, r.ms * 1.4); r.st--; }
       r.sp += (ts - r.sp) / 40;
 
       const { sy, sp2, cy } = moveRacer(r, 1 / 60);
@@ -508,8 +508,8 @@ export default function Game() {
 
       r.th = 1;
       let ts = 1 + r.th * (r.ms - 1);
-      if (r.bt > 0) { ts = r.ms * 1.25; r.bt--; }
-      if (r.st > 0) { ts = Math.max(ts, r.ms * 1.2); r.st--; }
+      if (r.bt > 0) { ts = r.ms * 1.5; r.bt--; }
+      if (r.st > 0) { ts = Math.max(ts, r.ms * 1.4); r.st--; }
       r.sp += (ts - r.sp) * dt * 2;
 
       if (ks[lK]) r.tr = 50 * D; else if (ks[rK]) r.tr = -50 * D; else r.tr = 0;
@@ -1158,7 +1158,7 @@ export default function Game() {
       }
       if (pauseRef.current) return;
       if (cd > 0) { cd--; fc++; return; }
-      if (!started) { started = 1; rs.forEach(r => { r.th = 1; r.sp = 1; }); }
+      if (!started) { started = 1; rs.forEach(r => { r.th = 1; r.sp = 0.5; }); }
       rt++;
 
       const pl = rs.filter(r => !r.npc);
