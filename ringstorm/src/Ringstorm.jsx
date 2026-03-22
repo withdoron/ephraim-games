@@ -32,7 +32,7 @@ export default function Game() {
 
     // Course gates
     const crs = [];
-    const baseY = cr === 3 ? 80 : cr === 1 ? 220 : 180;
+    const baseY = cr === 3 ? 80 : cr === 1 ? 220 : cr === 5 ? 160 : 180;
     const yVar = cr === 3 ? 15 : 30;
     const courseR = cr === 4 ? 1500 : 1200;
     if (!iB) {
@@ -72,6 +72,16 @@ export default function Game() {
         const wx = -TS / 2 + (i / GR) * TS, wz = -TS / 2 + (j / GR) * TS;
         const distC = Math.sqrt(wx * wx + wz * wz);
         h += 500 * Math.max(0, 1 - distC / 650);
+        tH[i][j] = h;
+      } }
+    } else if (cr === 5) {
+      // Ice Cavern — icy terrain with frozen lake in center
+      for (let i = 0; i <= GR; i++) { tH[i] = []; for (let j = 0; j <= GR; j++) {
+        const a = i / GR * 6, b = j / GR * 6;
+        let h = Math.sin(a * 1.5) * Math.cos(b * 1.1) * 60 + Math.sin(a * 2.8 + 1.5) * Math.cos(b * 2.0 + 1) * 30;
+        const wx = -TS / 2 + (i / GR) * TS, wz = -TS / 2 + (j / GR) * TS;
+        const distC = Math.sqrt(wx * wx + wz * wz);
+        if (distC < 500) h = Math.min(h, -15); // frozen lake in center
         tH[i][j] = h;
       } }
     } else {
@@ -219,6 +229,50 @@ export default function Game() {
       }
     }
 
+    // Ice Cavern — tunnels, icicles, and ice pillars (Course 5)
+    const tunnels = [];
+    const icicles = [];
+    if (!iB && cr === 5 && crs.length > 1) {
+      // 3 tunnel segments: gates 1-2, 3-4, 5-0
+      [[1,2],[3,4],[5,0]].forEach(([ga, gb]) => {
+        if (ga >= NG || gb >= NG) return;
+        const g1 = crs[ga], g2 = crs[gb];
+        const sections = [];
+        for (let s = 0; s <= 5; s++) {
+          const t = s / 5;
+          const cx = g1.x + (g2.x - g1.x) * t, cz = g1.z + (g2.z - g1.z) * t;
+          const cy = g1.y + (g2.y - g1.y) * t;
+          const dx = g2.x - g1.x, dz = g2.z - g1.z;
+          const len = Math.sqrt(dx * dx + dz * dz) || 1;
+          const px = -dz / len, pz = dx / len;
+          const wallOff = 55, wallH = 100, ceilY = cy + 50;
+          sections.push({
+            lx: cx + px * wallOff, lz: cz + pz * wallOff,
+            rx: cx - px * wallOff, rz: cz - pz * wallOff,
+            baseY: cy - 30, topY: cy - 30 + wallH, ceilY, cx, cz
+          });
+        }
+        tunnels.push(sections);
+        // Icicles hanging from ceiling
+        for (let ic = 0; ic < 4; ic++) {
+          const si = 1 + Math.floor(Math.random() * 4);
+          const sec = sections[si];
+          const perpT = (Math.random() - 0.5) * 0.8;
+          const ix = (sec.lx + sec.rx) / 2 + (sec.lx - sec.rx) * perpT;
+          const iz = (sec.lz + sec.rz) / 2 + (sec.lz - sec.rz) * perpT;
+          icicles.push({ x: ix, z: iz, topY: sec.ceilY, len: 15 + Math.random() * 15, w: 3 + Math.random() * 2 });
+        }
+      });
+      // Ice pillars outside tunnels
+      for (let i = 0; i < 8; i++) {
+        const gi = Math.floor(Math.random() * NG);
+        const g = crs[gi];
+        const a = Math.random() * Math.PI * 2, d = 80 + Math.random() * 150;
+        const mx = g.x + Math.cos(a) * d, mz = g.z + Math.sin(a) * d;
+        mts.push({ x: mx, z: mz, bY: gH(mx, mz), ht: 120 + Math.random() * 100, w: 25 + Math.random() * 20, icy: 1 });
+      }
+    }
+
     // Grand Canyon — continuous walls along course (Course 0 only)
     const canyon = [];
     const canyonL = [], canyonR = [];
@@ -340,7 +394,7 @@ export default function Game() {
       { id: "n3", nm: "STORM", ac: "#a855f7", cp: "#c084fc", sc: "#1a1a1a", npc: 1 },
     ];
     const ads = iB ? (i2 ? [...defs] : [defs[0], ...defs.slice(2)]) : (i2 ? defs : [defs[0], ...defs.slice(2)]);
-    const startY = cr === 3 ? 100 : cr === 1 ? 230 : 200;
+    const startY = cr === 3 ? 100 : cr === 1 ? 230 : cr === 5 ? 170 : 200;
     const sp = iB ? { x: 0, y: 200, z: 0 } : (crs[0] ? { ...crs[0], y: startY } : { x: 0, y: startY, z: 0 });
     const sd = (!iB && crs.length > 1) ? Math.atan2(crs[0].x - crs[NG - 1].x, crs[0].z - crs[NG - 1].z) : 0;
 
@@ -369,9 +423,36 @@ export default function Game() {
       };
     });
 
+    // Battle mode: force positions, yaw, and speed AFTER all init
+    if (iB) {
+      rs.forEach((r, i) => {
+        const ang = (i / rs.length) * Math.PI * 2;
+        r.x = Math.cos(ang) * 200;
+        r.z = Math.sin(ang) * 200;
+        r.y = 200;
+        r.yw = Math.atan2(0 - r.x, 0 - r.z);
+        r.sp = 0;
+        r.th = 1;
+      });
+    }
     const cm = rs.filter(r => !r.npc).map(r => ({ x: r.x, y: r.y + 20, z: r.z - 50, lx: r.x, ly: r.y, lz: r.z }));
+    // Battle mode: position cameras behind racers based on actual yaw
+    if (iB) {
+      const pls = rs.filter(r => !r.npc);
+      pls.forEach((r, i) => {
+        if (cm[i]) {
+          cm[i].x = r.x - Math.sin(r.yw) * 50;
+          cm[i].y = r.y + 20;
+          cm[i].z = r.z - Math.cos(r.yw) * 50;
+          cm[i].lx = r.x;
+          cm[i].ly = r.y;
+          cm[i].lz = r.z;
+        }
+      });
+    }
     let pj = [], storms = [], fc = 0, cd = 240, started = 0, rt = 0, fo = [];
     let tsunami = { active: false, triggered: false, angle: 0, progress: 0, duration: 420, spray: [] };
+    let earthquake = { active: false, triggered: false, progress: 0, duration: 360, intensity: 0, rocks: [] };
 
     function boom(p) {
       if (p.st > 0) return;
@@ -428,6 +509,40 @@ export default function Game() {
         // Right pillar collision
         const dR = Math.sqrt((r.x - ar.rx) ** 2 + (r.z - ar.rz) ** 2);
         if (dR < 15 && r.y > ar.y && r.y < ar.y + ar.ht) { boom(r); return 1; }
+      }
+      // Tunnel collision (Ice Cavern)
+      for (const secs of tunnels) {
+        for (let i = 0; i < secs.length - 1; i++) {
+          const a2 = secs[i], b2 = secs[i + 1];
+          // Check if racer is in this tunnel segment (between the two cross-sections along course)
+          const segDx = b2.cx - a2.cx, segDz = b2.cz - a2.cz;
+          const segLen = Math.sqrt(segDx * segDx + segDz * segDz) || 1;
+          const toR = { x: r.x - a2.cx, z: r.z - a2.cz };
+          const along = (toR.x * segDx + toR.z * segDz) / segLen;
+          if (along < -10 || along > segLen + 10) continue;
+          const t3 = Math.max(0, Math.min(1, along / segLen));
+          const lx = a2.lx + (b2.lx - a2.lx) * t3, lz = a2.lz + (b2.lz - a2.lz) * t3;
+          const rx = a2.rx + (b2.rx - a2.rx) * t3, rz = a2.rz + (b2.rz - a2.rz) * t3;
+          const cY = a2.ceilY + (b2.ceilY - a2.ceilY) * t3;
+          const perpX = lx - rx, perpZ = lz - rz;
+          const perpLen = Math.sqrt(perpX * perpX + perpZ * perpZ) || 1;
+          const perpDot = ((r.x - rx) * perpX + (r.z - rz) * perpZ) / (perpLen * perpLen);
+          if (perpDot >= -0.1 && perpDot <= 1.1) {
+            // Inside tunnel zone horizontally
+            if (r.y > cY) { boom(r); return 1; } // hit ceiling
+          }
+          // Wall collision — too far left or right
+          const dToL = Math.sqrt((r.x - lx) ** 2 + (r.z - lz) ** 2);
+          const dToR2 = Math.sqrt((r.x - rx) ** 2 + (r.z - rz) ** 2);
+          const bY = a2.baseY + (b2.baseY - a2.baseY) * t3;
+          if (dToL < 12 && r.y > bY && r.y < cY) { boom(r); return 1; }
+          if (dToR2 < 12 && r.y > bY && r.y < cY) { boom(r); return 1; }
+        }
+      }
+      // Icicle collision
+      for (const ic of icicles) {
+        const d = Math.sqrt((r.x - ic.x) ** 2 + (r.z - ic.z) ** 2);
+        if (d < 5 && r.y > ic.topY - ic.len && r.y < ic.topY) { boom(r); return 1; }
       }
       if (r.y > 600) r.y = 600;
       return 0;
@@ -551,9 +666,12 @@ export default function Game() {
       r.tr = -Math.max(-50 * D, Math.min(50 * D, yd * 2.5)) * tMul;
       r.rl += (r.tr - r.rl) / 18;
       r.yw += (-r.rl * 2.2 * (r.sp / r.ms)) / 60;
-      // NPC tsunami awareness: gain altitude during warning
+      // NPC event awareness
       if (cr === 3 && tsunami.active && tsunami.progress < 120 && !r.cr) {
         r.tp = 20 * D; // pitch up to fly over the wave
+      } else if (cr === 0 && earthquake.active && earthquake.intensity > 0.5 && !r.cr) {
+        // During earthquake, NPC steers toward track center (away from walls)
+        r.tp = 5 * D; // slight climb
       } else {
         r.tp = Math.max(-15 * D, Math.min(15 * D, (dy / Math.max(50, dH)) * 40 * D)) * tMul;
       }
@@ -693,6 +811,7 @@ export default function Game() {
       const stp = TS / GR, vD = 900;
       let shakeX = 0, shakeY = 0;
       if (vw.cr && vw.ct > (iB ? 55 : 65)) { shakeX = (Math.random() - 0.5) * 8; shakeY = (Math.random() - 0.5) * 8; }
+      if (earthquake.active && earthquake.intensity > 0) { shakeX += (Math.random() - 0.5) * 12 * earthquake.intensity; shakeY += (Math.random() - 0.5) * 12 * earthquake.intensity; }
 
       // Terrain — full detail within 300, skip-every-other beyond
       for (let step = 1; step <= 2; step++) {
@@ -722,6 +841,23 @@ export default function Game() {
             r = 20 + wt * 10; g = 60 + wt * 20; b = 120 + wt * 20;
             // Foam highlights at wave peaks
             if (h > -27) { const foam = (h + 27) / 5; r += foam * 140; g += foam * 120; b += foam * 80; }
+          } else if (cr === 5) {
+            // Ice Cavern — icy terrain colors
+            if (h < -10) {
+              // Frozen lake
+              const crack = Math.sin(i * 3.7 + j * 2.3) > 0.6 ? 1 : 0;
+              r = crack ? 60 : 40; g = crack ? 80 : 55; b = crack ? 110 : 75;
+            } else if (h < 30) {
+              // Snow
+              const v = Math.sin(i * 1.5 + j * 0.8) * 10;
+              r = 200 + v; g = 210 + v; b = 225 + v;
+            } else if (h < 80) {
+              // Ice cliff
+              const t2 = (h - 30) / 50;
+              r = 100 + t2 * 20; g = 120 + t2 * 15; b = 150 + t2 * 10;
+            } else {
+              r = 60; g = 55; b = 65;
+            }
           } else if (cr === 4) {
             // Volcano course — lava and volcanic rock with lava streaks on slopes
             const wx2 = -TS / 2 + i * stp + stp, wz2 = -TS / 2 + j * stp + stp;
@@ -769,7 +905,10 @@ export default function Game() {
           if (!a || !b) return;
           rn.push({ d: (a.d + pP.d) / 2, f() {
             x.globalAlpha = al;
-            if (m.volcanic) {
+            if (m.icy) {
+              x.globalAlpha = al * 0.8;
+              x.fillStyle = `rgb(${140 * sh + 40 | 0},${170 * sh + 30 | 0},${200 * sh + 20 | 0})`;
+            } else if (m.volcanic) {
               x.fillStyle = `rgb(${50 * sh + 15 | 0},${40 * sh + 12 | 0},${35 * sh + 10 | 0})`;
             } else {
               x.fillStyle = `rgb(${70 * sh + 30 | 0},${60 * sh + 25 | 0},${50 * sh + 20 | 0})`;
@@ -778,7 +917,7 @@ export default function Game() {
             // Edge stroke for definition
             x.strokeStyle = "rgba(0,0,0,0.12)"; x.lineWidth = 0.5;
             x.beginPath(); x.moveTo(a.sx, a.sy); x.lineTo(pP.sx, pP.sy); x.lineTo(b.sx, b.sy); x.closePath(); x.stroke();
-            if (!m.volcanic) {
+            if (!m.volcanic && !m.icy) {
               x.fillStyle = `rgb(${200 * sh + 40 | 0},${200 * sh + 40 | 0},${210 * sh + 30 | 0})`;
               const sY = m.bY + m.ht * 0.7;
               const sA = proj((a.sx === pL?.sx ? m.x - m.w / 2 : a.sx === pF?.sx ? m.x : a.sx === pR?.sx ? m.x + m.w / 2 : m.x), sY, (a.sx === pL?.sx ? m.z : a.sx === pF?.sx ? m.z - m.w / 2 : a.sx === pR?.sx ? m.z : m.z + m.w / 2), cam, vh);
@@ -966,10 +1105,16 @@ export default function Game() {
 
       // Canyon walls — 3D with front face + rim
       const rimD = 40;
+      const eqI = earthquake.intensity || 0;
       [canyonL, canyonR].forEach(side => {
         for (let i = 0; i < side.length - 1; i++) {
           const a = side[i], b = side[i + 1];
-          const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+          // Visual rumble during earthquake (rendering only)
+          const aRx = a.x + (eqI > 0 ? Math.sin(fc * 0.3 + a.ord) * 5 * eqI : 0);
+          const aRz = a.z + (eqI > 0 ? Math.cos(fc * 0.25 + a.ord * 1.3) * 5 * eqI : 0);
+          const bRx = b.x + (eqI > 0 ? Math.sin(fc * 0.3 + b.ord) * 5 * eqI : 0);
+          const bRz = b.z + (eqI > 0 ? Math.cos(fc * 0.25 + b.ord * 1.3) * 5 * eqI : 0);
+          const mx = (aRx + bRx) / 2, mz = (aRz + bRz) / 2;
           const dist = Math.sqrt((mx - vw.x) ** 2 + (mz - vw.z) ** 2);
           if (dist > 1000) continue;
           const al = Math.max(0.25, 1 - dist / 1000);
@@ -982,10 +1127,10 @@ export default function Game() {
             const cyB = Math.max(yB, Math.max(a.bY, b.bY));
             const cyT = Math.min(yT, Math.min(a.bY + a.ht, b.bY + b.ht));
             if (cyB >= cyT) return;
-            const pAB = proj(a.x, cyB, a.z, cam, vh);
-            const pAT = proj(a.x, cyT, a.z, cam, vh);
-            const pBB = proj(b.x, cyB, b.z, cam, vh);
-            const pBT = proj(b.x, cyT, b.z, cam, vh);
+            const pAB = proj(aRx, cyB, aRz, cam, vh);
+            const pAT = proj(aRx, cyT, aRz, cam, vh);
+            const pBB = proj(bRx, cyB, bRz, cam, vh);
+            const pBT = proj(bRx, cyT, bRz, cam, vh);
             if (!pAB || !pAT || !pBB || !pBT) return;
             rn.push({ d: (pAB.d + pBB.d) / 2, f() {
               x.globalAlpha = al;
@@ -996,10 +1141,10 @@ export default function Game() {
           });
           // Top rim face — flat horizontal quad at wall top
           const aTopY = a.bY + a.ht, bTopY = b.bY + b.ht;
-          const aIT = proj(a.x, aTopY, a.z, cam, vh);
-          const bIT = proj(b.x, bTopY, b.z, cam, vh);
-          const aOT = proj(a.x + a.px * rimD, aTopY, a.z + a.pz * rimD, cam, vh);
-          const bOT = proj(b.x + b.px * rimD, bTopY, b.z + b.pz * rimD, cam, vh);
+          const aIT = proj(aRx, aTopY, aRz, cam, vh);
+          const bIT = proj(bRx, bTopY, bRz, cam, vh);
+          const aOT = proj(aRx + a.px * rimD, aTopY, aRz + a.pz * rimD, cam, vh);
+          const bOT = proj(bRx + b.px * rimD, bTopY, bRz + b.pz * rimD, cam, vh);
           if (aIT && bIT && aOT && bOT) {
             rn.push({ d: (aIT.d + bIT.d) / 2 - 1, f() {
               x.globalAlpha = al;
@@ -1010,6 +1155,71 @@ export default function Game() {
           }
         }
       });
+
+      // Ice tunnels (Course 5)
+      if (cr === 5) {
+        tunnels.forEach(secs => {
+          for (let i = 0; i < secs.length - 1; i++) {
+            const a = secs[i], b2 = secs[i + 1];
+            const mx = (a.cx + b2.cx) / 2, mz = (a.cz + b2.cz) / 2;
+            const dist = Math.sqrt((mx - vw.x) ** 2 + (mz - vw.z) ** 2);
+            if (dist > 600) continue;
+            const al = Math.max(0.3, 1 - dist / 600);
+            // Left wall
+            const pLB_a = proj(a.lx, a.baseY, a.lz, cam, vh);
+            const pLT_a = proj(a.lx, a.topY, a.lz, cam, vh);
+            const pLB_b = proj(b2.lx, b2.baseY, b2.lz, cam, vh);
+            const pLT_b = proj(b2.lx, b2.topY, b2.lz, cam, vh);
+            if (pLB_a && pLT_a && pLB_b && pLT_b) {
+              rn.push({ d: (pLB_a.d + pLB_b.d) / 2, f() {
+                x.globalAlpha = al * 0.85;
+                x.fillStyle = "rgb(140,170,200)";
+                x.beginPath(); x.moveTo(pLB_a.sx, pLB_a.sy); x.lineTo(pLT_a.sx, pLT_a.sy);
+                x.lineTo(pLT_b.sx, pLT_b.sy); x.lineTo(pLB_b.sx, pLB_b.sy); x.closePath(); x.fill();
+                x.globalAlpha = 1;
+              }});
+            }
+            // Right wall
+            const pRB_a = proj(a.rx, a.baseY, a.rz, cam, vh);
+            const pRT_a = proj(a.rx, a.topY, a.rz, cam, vh);
+            const pRB_b = proj(b2.rx, b2.baseY, b2.rz, cam, vh);
+            const pRT_b = proj(b2.rx, b2.topY, b2.rz, cam, vh);
+            if (pRB_a && pRT_a && pRB_b && pRT_b) {
+              rn.push({ d: (pRB_a.d + pRB_b.d) / 2, f() {
+                x.globalAlpha = al * 0.85;
+                x.fillStyle = "rgb(120,150,185)";
+                x.beginPath(); x.moveTo(pRB_a.sx, pRB_a.sy); x.lineTo(pRT_a.sx, pRT_a.sy);
+                x.lineTo(pRT_b.sx, pRT_b.sy); x.lineTo(pRB_b.sx, pRB_b.sy); x.closePath(); x.fill();
+                x.globalAlpha = 1;
+              }});
+            }
+            // Ceiling
+            if (pLT_a && pRT_a && pLT_b && pRT_b) {
+              rn.push({ d: (pLT_a.d + pRT_a.d) / 2 - 1, f() {
+                x.globalAlpha = al * 0.7;
+                x.fillStyle = "rgb(170,195,220)";
+                x.beginPath(); x.moveTo(pLT_a.sx, pLT_a.sy); x.lineTo(pRT_a.sx, pRT_a.sy);
+                x.lineTo(pRT_b.sx, pRT_b.sy); x.lineTo(pLT_b.sx, pLT_b.sy); x.closePath(); x.fill();
+                x.globalAlpha = 1;
+              }});
+            }
+          }
+        });
+        // Icicles
+        icicles.forEach(ic => {
+          const dist = Math.sqrt((ic.x - vw.x) ** 2 + (ic.z - vw.z) ** 2);
+          if (dist > 400) return;
+          const pT = proj(ic.x, ic.topY, ic.z, cam, vh);
+          const pB = proj(ic.x, ic.topY - ic.len, ic.z, cam, vh);
+          if (!pT || !pB) return;
+          rn.push({ d: pT.d, f() {
+            const w2 = Math.max(1, ic.w * pT.sc);
+            x.fillStyle = "rgba(160,200,230,0.8)";
+            x.beginPath(); x.moveTo(pT.sx - w2, pT.sy); x.lineTo(pT.sx + w2, pT.sy);
+            x.lineTo(pB.sx, pB.sy); x.closePath(); x.fill();
+          }});
+        });
+      }
 
       // Course gates — solid torus rings
       if (!iB) crs.forEach((ring, idx) => {
@@ -1316,6 +1526,19 @@ export default function Game() {
         }
       }
 
+      // Earthquake falling rocks (Canyon)
+      if (earthquake.active) {
+        earthquake.rocks.forEach(rk => {
+          if (!rk.alive) return;
+          const p = proj(rk.x, rk.y, rk.z, cam, vh);
+          if (!p || p.d > 600) return;
+          rn.push({ d: p.d, f() {
+            x.fillStyle = "rgb(140,90,50)";
+            x.beginPath(); x.arc(p.sx, p.sy, Math.max(2, rk.sz * p.sc), 0, Math.PI * 2); x.fill();
+          }});
+        });
+      }
+
       // Shadow under player plane
       if (!vw.cr && !vw.fn) {
         const shY = gH(vw.x, vw.z);
@@ -1461,6 +1684,14 @@ export default function Game() {
         x.textAlign = "center"; x.fillText("🌊 TSUNAMI!", W / 2, vh * 0.35);
         x.textAlign = "start"; x.globalAlpha = 1;
       }
+      // Earthquake warning — flashing "EARTHQUAKE!" for 1.5 seconds
+      if (cr === 0 && earthquake.active && earthquake.progress < 90) {
+        const pulse = 0.5 + Math.sin(fc * 0.15) * 0.5;
+        x.globalAlpha = pulse;
+        x.fillStyle = "#f97316"; x.font = "bold " + (i2 ? 24 : 40) + "px Georgia";
+        x.textAlign = "center"; x.fillText("🏜️ EARTHQUAKE!", W / 2, vh * 0.35);
+        x.textAlign = "start"; x.globalAlpha = 1;
+      }
       x.restore();
     }
 
@@ -1589,6 +1820,49 @@ export default function Game() {
         }
       }
 
+      // Earthquake — Grand Canyon (cr===0) only, triggers on lap 3
+      if (cr === 0 && !iB) {
+        if (!earthquake.triggered) {
+          for (const r of rs) {
+            if (r.lp >= 2) {
+              earthquake.active = true;
+              earthquake.triggered = true;
+              earthquake.progress = 0;
+              // Spawn falling rocks from canyon wall tops
+              earthquake.rocks = [];
+              for (let i = 0; i < 10; i++) {
+                const ci = Math.floor(Math.random() * canyon.length);
+                if (!canyon[ci]) continue;
+                const cw = canyon[ci];
+                earthquake.rocks.push({ x: cw.x + (Math.random() - 0.5) * 20, y: cw.bY + cw.ht, z: cw.z + (Math.random() - 0.5) * 20, vy: 0, sz: 3 + Math.random() * 3, alive: true });
+              }
+              break;
+            }
+          }
+        }
+        if (earthquake.active) {
+          earthquake.progress++;
+          // Intensity ramp: up for 60, full for 240, down for 60
+          if (earthquake.progress < 60) earthquake.intensity = earthquake.progress / 60;
+          else if (earthquake.progress < 300) earthquake.intensity = 1;
+          else earthquake.intensity = (earthquake.duration - earthquake.progress) / 60;
+          if (earthquake.progress >= earthquake.duration) { earthquake.active = false; earthquake.intensity = 0; }
+          // Update falling rocks
+          earthquake.rocks.forEach(rk => {
+            if (!rk.alive) return;
+            rk.vy -= 0.15; rk.y += rk.vy;
+            if (rk.y < gH(rk.x, rk.z)) { rk.alive = false; return; }
+            // Rock-racer collision
+            rs.forEach(r => {
+              if (r.cr || r.fn || r.st > 0) return;
+              if (Math.sqrt((r.x - rk.x) ** 2 + (r.y - rk.y) ** 2 + (r.z - rk.z) ** 2) < 12) {
+                boom(r); rk.alive = false;
+              }
+            });
+          });
+        }
+      }
+
       // End conditions
       if (iB) {
         const al = rs.filter(r => !r.fn);
@@ -1678,6 +1952,7 @@ export default function Game() {
       { name: "MOUNTAIN PASS", desc: "Thread the needle between snow-capped peaks", color: "#3b82f6", emoji: "\u{1F3D4}\u{FE0F}" },
       { name: "OCEAN RUN", desc: "Skim the waves over endless open ocean", color: "#06b6d4", emoji: "\u{1F30A}" },
       { name: "VOLCANO", desc: "Fly over rivers of lava around an active volcano", color: "#dc2626", emoji: "\u{1F30B}" },
+      { name: "ICE CAVERN", desc: "Race through frozen tunnels and icy cliffs", color: "#67e8f9", emoji: "❄️" },
     ];
     return (
       <div style={{ width: "100%", minHeight: "100vh", background: bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: ft, color: "#e2e8f0", padding: "20px", textAlign: "center" }}>
