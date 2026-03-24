@@ -96,12 +96,22 @@ func get_race_position(racer: Node) -> int:
 		var idx = alive.find(racer)
 		return idx + 1 if idx >= 0 else alive.size()
 	else:
+		# Finished racers are always ahead
+		var ahead = finish_order.filter(func(r): return r != racer).size()
+		if racer.race_finished:
+			return racer.finish_position
 		var active = racers.filter(func(r): return not r.race_finished)
+		# Sort by progress (lap*gates + gate), use distance to next gate as tiebreaker
 		active.sort_custom(func(a, b):
 			var pa = a.current_lap * Settings.num_gates + a.current_gate
 			var pb = b.current_lap * Settings.num_gates + b.current_gate
-			return pa > pb
+			if pa != pb: return pa > pb
+			# Tiebreaker: closer to next gate = further ahead
+			if course and course.gates.size() > 0:
+				var ga = course.get_gate_position(a.current_gate)
+				var gb = course.get_gate_position(b.current_gate)
+				return a.global_position.distance_to(ga) < b.global_position.distance_to(gb)
+			return false
 		)
 		var idx = active.find(racer)
-		var ahead = finish_order.filter(func(r): return r != racer).size()
 		return (idx + 1 if idx >= 0 else active.size()) + ahead

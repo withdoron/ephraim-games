@@ -92,36 +92,27 @@ func create_gate_visuals():
 		gate_meshes.append(ring_node)
 
 func create_path_ribbon():
+	# Simple dotted path: small glowing spheres between gates
 	for i in range(gates.size()):
 		var from_pos = gates[i]
 		var to_pos = gates[(i + 1) % gates.size()]
-		var segments = 10
-		for s in range(segments):
-			var t0 = float(s) / float(segments)
-			var t1 = float(s + 1) / float(segments)
-			var pos = from_pos.lerp(to_pos, t0)
-			var next_pos = from_pos.lerp(to_pos, t1)
-
-			var seg = MeshInstance3D.new()
-			var cyl = CylinderMesh.new()
-			cyl.top_radius = 0.3
-			cyl.bottom_radius = 0.3
-			cyl.height = pos.distance_to(next_pos)
-			seg.mesh = cyl
-
+		for s in range(1, 8):  # 7 dots between each gate pair
+			var t = float(s) / 8.0
+			var pos = from_pos.lerp(to_pos, t)
+			var dot = MeshInstance3D.new()
+			var sphere = SphereMesh.new()
+			sphere.radius = 0.4
+			sphere.height = 0.8
+			dot.mesh = sphere
 			var mat = StandardMaterial3D.new()
-			mat.albedo_color = Color(1.0, 0.8, 0.2, 0.12)
+			mat.albedo_color = Color(1.0, 0.8, 0.2, 0.25)
 			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			mat.emission_enabled = true
 			mat.emission = Color(1.0, 0.7, 0.1)
-			mat.emission_energy_multiplier = 0.2
-			seg.material_override = mat
-
-			var mid = (pos + next_pos) / 2.0
-			seg.global_position = mid
-			seg.look_at(next_pos, Vector3.UP)
-			seg.rotate_object_local(Vector3.RIGHT, PI / 2.0)
-			add_child(seg)
+			mat.emission_energy_multiplier = 0.3
+			dot.material_override = mat
+			dot.global_position = pos
+			add_child(dot)
 
 func update_gate_colors(current_gate: int):
 	for i in range(gate_meshes.size()):

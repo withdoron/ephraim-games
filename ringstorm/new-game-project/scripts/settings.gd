@@ -2,14 +2,14 @@ extends Node
 # Autoload singleton — all tunable game parameters
 # Ported from Ringstorm.jsx settings panel
 
-# Speed
-var player_speed: float = 6.0
-var npc_speed: float = 5.5
+# Speed — tuned for Godot 3D (browser speed was ~6 but different unit scale)
+var player_speed: float = 30.0
+var npc_speed: float = 25.0
 var boost_multiplier: float = 1.5
 var star_multiplier: float = 1.4
-var start_speed: float = 1.0
+var start_speed: float = 5.0
 var brake_strength: float = 0.5
-var min_brake_speed: float = 1.0
+var min_brake_speed: float = 5.0
 
 # Controller
 var deadzone_x: float = 0.3

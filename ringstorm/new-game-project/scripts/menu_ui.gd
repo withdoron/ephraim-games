@@ -168,11 +168,11 @@ func _show_settings():
 	_add_spacer(vbox, 8)
 
 	_add_section_header(vbox, "SPEED")
-	_add_slider(vbox, "Player Speed", Settings.player_speed, 2.0, 15.0, 0.5, func(v): Settings.player_speed = v)
-	_add_slider(vbox, "NPC Speed", Settings.npc_speed, 2.0, 15.0, 0.5, func(v): Settings.npc_speed = v)
+	_add_slider(vbox, "Player Speed", Settings.player_speed, 10.0, 60.0, 1.0, func(v): Settings.player_speed = v)
+	_add_slider(vbox, "NPC Speed", Settings.npc_speed, 10.0, 60.0, 1.0, func(v): Settings.npc_speed = v)
 	_add_slider(vbox, "Boost Power", Settings.boost_multiplier, 1.1, 2.5, 0.1, func(v): Settings.boost_multiplier = v)
 	_add_slider(vbox, "Star Power", Settings.star_multiplier, 1.1, 2.5, 0.1, func(v): Settings.star_multiplier = v)
-	_add_slider(vbox, "Start Speed", Settings.start_speed, 0.0, 5.0, 0.5, func(v): Settings.start_speed = v)
+	_add_slider(vbox, "Start Speed", Settings.start_speed, 0.0, 15.0, 1.0, func(v): Settings.start_speed = v)
 	_add_slider(vbox, "Brake Strength", Settings.brake_strength, 0.1, 0.9, 0.05, func(v): Settings.brake_strength = v)
 
 	_add_section_header(vbox, "CONTROLLER")
@@ -251,9 +251,9 @@ func _add_toggle(parent: Control, label_text: String, current_value: bool, on_ch
 	parent.add_child(row)
 
 func _reset_settings():
-	Settings.player_speed = 6.0; Settings.npc_speed = 5.5
+	Settings.player_speed = 30.0; Settings.npc_speed = 25.0
 	Settings.boost_multiplier = 1.5; Settings.star_multiplier = 1.4
-	Settings.start_speed = 1.0; Settings.brake_strength = 0.5
+	Settings.start_speed = 5.0; Settings.brake_strength = 0.5
 	Settings.deadzone_x = 0.3; Settings.deadzone_y = 0.4
 	Settings.stick_sensitivity = 1.0; Settings.pitch_sensitivity = 1.0
 	Settings.invert_y_p1 = false; Settings.invert_y_p2 = false
