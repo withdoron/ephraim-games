@@ -185,39 +185,46 @@ func _physics_process(delta):
 					tz = tz * 0.7 + beh.z * 0.3
 					break
 
-	# --- STEERING --- simplified for Godot native transforms
+	# --- STEERING --- using Godot's native transform basis
 	var target_pos = Vector3(tx, ty, tz)
 	var to_target = target_pos - global_position
-	var flat_to_target = Vector3(to_target.x, 0, to_target.z)
-	var dH = flat_to_target.length()
+	var flat_dir = Vector3(to_target.x, 0, to_target.z)
+	var dH = flat_dir.length()
 
-	# Desired yaw: angle toward target in world XZ plane
-	var desired_yaw = atan2(to_target.x, to_target.z)
-	# Current facing direction
-	var cur_forward = -transform.basis.z
-	var current_yaw = atan2(cur_forward.x, cur_forward.z)
+	# Get current forward and calculate angular error using cross/dot products
+	# This avoids atan2 ambiguity entirely
+	var cur_forward = -global_transform.basis.z
+	var cur_flat = Vector3(cur_forward.x, 0, cur_forward.z).normalized()
+	var tgt_flat = flat_dir.normalized() if dH > 1.0 else cur_flat
 
-	wander_phase += 0.02
-	var wobble = sin(wander_phase) * (1.0 - skill_level) * 0.08
+	# Cross product Y gives signed turn error: positive = target is to our RIGHT
+	var cross_y = cur_flat.x * tgt_flat.z - cur_flat.z * tgt_flat.x
+	# Dot product gives how aligned we are (1 = facing target, -1 = facing away)
+	var dot_fwd = cur_flat.dot(tgt_flat)
 
-	var yaw_diff = desired_yaw - current_yaw + wobble
-	while yaw_diff > PI: yaw_diff -= TAU
-	while yaw_diff < -PI: yaw_diff += TAU
+	wander_phase += delta * 1.2
+	var wobble = sin(wander_phase) * (1.0 - skill_level) * 0.15
 
 	var tumble_mul = 0.2 if tumble_timer > 0 else 1.0
-	# Turn toward target — proportional steering
-	# Negate because rotate_y(positive) = turn LEFT in Godot, but positive yaw_diff = target is RIGHT
-	var turn_amount = clamp(yaw_diff * 2.0, -2.5, 2.5) * tumble_mul / 60.0
-	rotate_y(-turn_amount)
-	roll_value = lerp(roll_value, turn_amount * 15.0, 0.1)  # Bank into the turn
+
+	# Turn toward target — proportional, delta-based
+	# cross_y > 0 means target is right → need negative rotate_y (Godot: positive = left)
+	var turn_str = clamp(cross_y * 3.0 + wobble, -1.0, 1.0) * tumble_mul
+	var turn_rate = Settings.turn_rate * 0.06  # Scale to feel right for NPCs
+	rotate_y(-turn_str * turn_rate * delta)
+
+	# Visual roll — bank into turns
+	var roll_target = turn_str * deg_to_rad(25)
+	roll_value = lerp(roll_value, roll_target, delta * 4.0)
 
 	# Pitch toward target altitude
-	var pitch_target = clamp(to_target.y / max(20.0, dH) * 0.8, -0.5, 0.5) * tumble_mul
-	pitch_angle = lerp(pitch_angle, pitch_target, 0.04)
+	var alt_diff = to_target.y
+	var pitch_target = clamp(alt_diff / max(20.0, dH) * 1.5, -0.6, 0.6) * tumble_mul
+	pitch_angle = lerp(pitch_angle, pitch_target, delta * 3.0)
 	if tumble_timer > 0:
 		tumble_timer -= 1
 
-	# Speed
+	# Speed — delta-based interpolation
 	var ts = max_speed * (0.8 + skill_level * 0.2)
 	if boost_timer > 0:
 		ts = max_speed * Settings.boost_multiplier; boost_timer -= 1
@@ -225,7 +232,7 @@ func _physics_process(delta):
 		ts = max(ts, max_speed * Settings.star_multiplier); star_timer -= 1
 	if slipstream_boost > 0:
 		ts = max(ts, max_speed * Settings.star_multiplier); slipstream_boost -= 1
-	current_speed += (ts - current_speed) / 40.0
+	current_speed = lerp(current_speed, ts, delta * 2.0)
 
 	# Move forward along facing direction with pitch
 	var forward = -transform.basis.z
@@ -267,7 +274,7 @@ func _check_gate():
 		return
 	var gate_pos = race_course.get_gate_position(current_gate)
 	var dist = global_position.distance_to(gate_pos)
-	if dist < race_course.gate_size + 5.0:
+	if dist < race_course.gate_size + 8.0:  # Slightly larger tolerance for NPCs
 		if race_manager:
 			race_manager.on_racer_passed_gate(self)
 
