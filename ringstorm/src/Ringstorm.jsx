@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 const D = Math.PI / 180;
 const PW = [{id:"gun",n:"Gun",e:"🔫",c:"#f59e0b"},{id:"boost",n:"Boost",e:"🚀",c:"#22c55e"},{id:"missile",n:"Missile",e:"💥",c:"#ef4444"},{id:"star",n:"Star",e:"⭐",c:"#fbbf24"},{id:"flares",n:"Flares",e:"🛡️",c:"#38bdf8"},{id:"lightning",n:"Storm",e:"⚡",c:"#a855f7"},{id:"tornado",n:"Tornado",e:"🌪️",c:"#06b6d4"}];
-const LAPS = 3, NG = 6;
+const LAPS = 3, NG = 7;
 const SHORTCUTS = [
   { cr: 0, gateFrom: 2, gateTo: 3, gateskip: 1, type: "canyon" },
   { cr: 1, gateFrom: 4, gateTo: 5, gateskip: 1, type: "island" },
@@ -10,6 +10,7 @@ const SHORTCUTS = [
   { cr: 3, gateFrom: 0, gateTo: 1, gateskip: 1, type: "ocean" },
   { cr: 4, gateFrom: 3, gateTo: 4, gateskip: 1, type: "volcano" },
   { cr: 5, gateFrom: 0, gateTo: 1, gateskip: 1, type: "ice" },
+  { cr: 6, gateFrom: 3, gateTo: 4, gateskip: 1, type: "space" },
 ];
 
 export default function Game() {
@@ -42,13 +43,13 @@ export default function Game() {
 
     // Course gates
     const crs = [];
-    const baseY = cr === 3 ? 80 : cr === 1 ? 220 : cr === 5 ? 160 : 180;
-    const yVar = cr === 3 ? 15 : 30;
-    const courseR = cr === 4 ? 1500 : 1200;
+    const baseY = cr === 3 ? 80 : cr === 1 ? 220 : cr === 5 ? 160 : cr === 6 ? 225 : 180;
+    const yVar = cr === 3 ? 15 : cr === 6 ? 80 : 30;
+    const courseR = cr === 4 ? 1500 : cr === 6 ? 1100 : 1200;
     if (!iB) {
       for (let i = 0; i < NG; i++) {
         const a = (i / NG) * Math.PI * 2;
-        crs.push({ x: Math.cos(a) * courseR + Math.cos(a * 2) * 60, y: baseY + Math.sin(a * 2 + 1) * yVar, z: Math.sin(a) * courseR + Math.sin(a * 3) * 50, sz: 55 });
+        crs.push({ x: Math.cos(a) * courseR + Math.cos(a * 2) * 60, y: baseY + Math.sin(a * 2 + 1) * yVar, z: Math.sin(a) * courseR + Math.sin(a * 3) * 50, sz: cr === 6 ? 50 : 55 });
       }
     }
 
@@ -58,6 +59,11 @@ export default function Game() {
       crs[0].y = 180; crs[1].y = 180;
       crs[2].y = 100; crs[3].y = 110;
       crs[4].y = 300; crs[5].y = 180;
+    }
+    if (!iB && cr === 6 && crs.length >= NG) {
+      // Deep Space: dramatic elevation changes
+      crs[0].y = 200; crs[1].y = 350; crs[2].y = 150; crs[3].y = 300;
+      crs[4].y = 100; crs[5].y = 280; crs[6].y = 180;
     }
     if (!iB && cr === 3 && crs.length >= NG) {
       // Ocean Run: wave skimming + low gates through arches at 1, 3, 5
@@ -101,6 +107,7 @@ export default function Game() {
       for (let i = 0; i <= GR; i++) { tH[i] = []; for (let j = 0; j <= GR; j++) { const a = i / GR * 6, b = j / GR * 6; tH[i][j] = Math.sin(a * 1.2) * Math.cos(b * 0.8) * 80 + Math.sin(a * 2.5 + 1) * Math.cos(b * 1.8 + 2) * 40; } }
     }
     function gH(wx, wz) {
+      if (cr === 6) return -9999; // Deep Space — no ground
       const gx = ((wx + TS / 2) / TS) * GR, gz = ((wz + TS / 2) / TS) * GR;
       const ix = Math.max(0, Math.min(GR - 1, Math.floor(gx))), iz = Math.max(0, Math.min(GR - 1, Math.floor(gz)));
       const fx = gx - ix, fz = gz - iz;
@@ -345,6 +352,44 @@ export default function Game() {
         });
       }
     }
+    // Deep Space — asteroids, planets, space station (Course 6)
+    const asteroids = [];
+    const planets = [];
+    let spaceStation = null;
+    if (!iB && cr === 6 && crs.length > 1) {
+      // 40 asteroids scattered near the course path
+      const astColors = ["rgb(100,90,80)","rgb(120,110,95)","rgb(80,75,70)","rgb(140,125,110)"];
+      for (let i = 0; i < 40; i++) {
+        const gi = Math.floor(Math.random() * NG);
+        const g1 = crs[gi], g2 = crs[(gi + 1) % NG];
+        const t = Math.random();
+        const ax = g1.x + (g2.x - g1.x) * t + (Math.random() - 0.5) * 600;
+        const az = g1.z + (g2.z - g1.z) * t + (Math.random() - 0.5) * 600;
+        const ay = g1.y + (g2.y - g1.y) * t + (Math.random() - 0.5) * 200;
+        const rad = 10 + Math.random() * 30;
+        const verts = [];
+        const nv = 7 + Math.floor(Math.random() * 3);
+        for (let v = 0; v < nv; v++) verts.push(0.8 + Math.random() * 0.4);
+        asteroids.push({ x: ax, y: ay, z: az, radius: rad, rot: Math.random() * Math.PI * 2, rotSpeed: 0.005 + Math.random() * 0.015, color: astColors[Math.floor(Math.random() * astColors.length)], verts, nv });
+      }
+      // Safety cleanup — remove asteroids too close to gates or path midpoints
+      for (let i = asteroids.length - 1; i >= 0; i--) {
+        const a = asteroids[i]; let tooClose = false;
+        for (const g of crs) { if (Math.sqrt((a.x - g.x) ** 2 + (a.y - g.y) ** 2 + (a.z - g.z) ** 2) < 60 + a.radius) { tooClose = true; break; } }
+        if (!tooClose) for (let gi2 = 0; gi2 < NG; gi2++) { const ga = crs[gi2], gb = crs[(gi2 + 1) % NG]; const mx = (ga.x + gb.x) / 2, my = (ga.y + gb.y) / 2, mz = (ga.z + gb.z) / 2; if (Math.sqrt((a.x - mx) ** 2 + (a.y - my) ** 2 + (a.z - mz) ** 2) < 50 + a.radius) { tooClose = true; break; } }
+        if (tooClose) asteroids.splice(i, 1);
+      }
+      // Planets — decorative, no collision
+      planets.push({ x: 800, y: 300, z: 600, radius: 200, type: "gas" });
+      planets.push({ x: -600, y: 200, z: -800, radius: 80, type: "rocky" });
+      // Space station near midpoint of gates 2-3
+      const sg1 = crs[2], sg2 = crs[3];
+      const sdx = sg2.x - sg1.x, sdz = sg2.z - sg1.z;
+      const slen = Math.sqrt(sdx * sdx + sdz * sdz) || 1;
+      const spx = -sdz / slen, spz = sdx / slen;
+      spaceStation = { x: (sg1.x + sg2.x) / 2 + spx * 80, y: (sg1.y + sg2.y) / 2, z: (sg1.z + sg2.z) / 2 + spz * 80, rot: 0 };
+    }
+
     // Shortcut bonus gates — one per course (race only)
     const bonusGates = [];
     if (!iB && crs.length > 1) {
@@ -365,6 +410,7 @@ export default function Game() {
           bx = mx + Math.sin(toC) * 100; bz = mz + Math.cos(toC) * 100; by = my + 20;
         }
         else if (scut.type === "ice") { bx = mx + px * 60; bz = mz + pz * 60; by = my - 15; }
+        else if (scut.type === "space") { bx = mx + px * 150; bz = mz + pz * 150; by = my + 40; }
         bonusGates.push({ x: bx, y: by, z: bz, sz: 25, gateFrom: scut.gateFrom, gateskip: scut.gateskip, type: scut.type });
       }
       // Canyon shortcut: remove 2 right-wall segments between gates 2-3 to create a gap
@@ -475,7 +521,7 @@ export default function Game() {
       { id: "n3", nm: "STORM", ac: "#a855f7", cp: "#c084fc", sc: "#1a1a1a", npc: 1 },
     ];
     const ads = iB ? (i2 ? [...defs] : [defs[0], ...defs.slice(2)]) : (i2 ? defs : [defs[0], ...defs.slice(2)]);
-    const startY = cr === 3 ? 100 : cr === 1 ? 230 : cr === 5 ? 170 : 200;
+    const startY = cr === 3 ? 100 : cr === 1 ? 230 : cr === 5 ? 170 : cr === 6 ? 210 : 200;
     const sp = iB ? { x: 0, y: 200, z: 0 } : (crs[0] ? { ...crs[0], y: startY } : { x: 0, y: startY, z: 0 });
     const sd = (!iB && crs.length > 1) ? Math.atan2(crs[0].x - crs[NG - 1].x, crs[0].z - crs[NG - 1].z) : 0;
 
@@ -632,6 +678,11 @@ export default function Game() {
         const perpDist = Math.abs(toRx * (-archDz / archLen) + toRz * (archDx / archLen));
         const beamThick = 10;
         if (along2 > 0 && along2 < archLen && perpDist < ar.w * 0.6 && r.y > ar.y + ar.ht - beamThick && r.y < ar.y + ar.ht + 5) { boom(r); return 1; }
+      }
+      // Asteroid collision (Deep Space)
+      for (const ast of asteroids) {
+        const d = Math.sqrt((r.x - ast.x) ** 2 + (r.y - ast.y) ** 2 + (r.z - ast.z) ** 2);
+        if (d < ast.radius + 8) { boom(r); return 1; }
       }
       if (r.y > 600) r.y = 600;
       return 0;
@@ -959,7 +1010,10 @@ export default function Game() {
       x.beginPath(); x.rect(0, yO, W, vh); x.clip(); x.translate(0, yO);
       // Sky gradient
       const sg = x.createLinearGradient(0, 0, 0, vh);
-      if (isNight) {
+      if (cr === 6) {
+        sg.addColorStop(0, "#000000"); sg.addColorStop(0.4, "#030210"); sg.addColorStop(0.7, "#060315");
+        sg.addColorStop(1, "#0a0515");
+      } else if (isNight) {
         sg.addColorStop(0, "#020408"); sg.addColorStop(0.3, "#0a0e1a"); sg.addColorStop(0.6, "#0f1525");
         sg.addColorStop(0.8, "#1a2035"); sg.addColorStop(1, "#1a2540");
       } else {
@@ -968,7 +1022,21 @@ export default function Game() {
         sg.addColorStop(0.85, "#87CEEB"); sg.addColorStop(1, "#d4a060");
       }
       x.fillStyle = sg; x.fillRect(0, 0, W, vh);
-      if (isNight) {
+      if (cr === 6) {
+        // Deep space stars — 60 fixed positions
+        for (let si = 0; si < 60; si++) {
+          const sx2 = ((si * 113.7 + 31) % W), sy2 = ((si * 73.9 + 19) % vh);
+          const tw = si % 7 < 2 ? Math.sin(fc * 0.02 + si * 1.7) * 0.3 : 0;
+          const br = 0.4 + (si * 17 % 10) / 10 * 0.6 + tw;
+          x.fillStyle = `rgba(255,255,255,${Math.min(1, br)})`;
+          const sz2 = 1 + (si % 4 === 0 ? 2 : si % 3 === 0 ? 1 : 0);
+          x.fillRect(sx2, sy2, sz2, sz2);
+        }
+        // Nebula — subtle purple-blue haze
+        const nebG = x.createRadialGradient(W * 0.3, vh * 0.25, 0, W * 0.3, vh * 0.25, vh * 0.4);
+        nebG.addColorStop(0, "rgba(80,30,120,0.08)"); nebG.addColorStop(0.5, "rgba(30,60,120,0.04)"); nebG.addColorStop(1, "rgba(0,0,0,0)");
+        x.fillStyle = nebG; x.fillRect(0, 0, W, vh);
+      } else if (isNight) {
         // Stars
         for (let si = 0; si < 40; si++) {
           const sx2 = ((si * 137.5 + 23) % W), sy2 = ((si * 89.3 + 47) % (vh * 0.5));
@@ -994,8 +1062,8 @@ export default function Game() {
       if (vw.cr && vw.ct > (iB ? 55 : 65)) { shakeX = (Math.random() - 0.5) * 8; shakeY = (Math.random() - 0.5) * 8; }
       if (earthquake.active && earthquake.intensity > 0) { shakeX += (Math.random() - 0.5) * 12 * earthquake.intensity; shakeY += (Math.random() - 0.5) * 12 * earthquake.intensity; }
 
-      // Terrain — full detail within 300, skip-every-other beyond
-      for (let step = 1; step <= 2; step++) {
+      // Terrain — full detail within 300, skip-every-other beyond (skip for Deep Space)
+      for (let step = 1; step <= (cr === 6 ? 0 : 2); step++) {
         const skip = step === 1 ? 1 : 2;
         for (let i = 0; i < GR; i += skip) {
           for (let j = 0; j < GR; j += skip) {
@@ -1429,7 +1497,7 @@ export default function Game() {
           x.rotate(Math.PI / 4 + spin);
           if (c.active) {
             // Golden box
-            x.shadowColor = "rgba(255,200,50,0.5)"; x.shadowBlur = isNight ? 12 : 8;
+            x.shadowColor = "rgba(255,200,50,0.5)"; x.shadowBlur = (isNight || cr === 6) ? 12 : 8;
             x.fillStyle = "rgb(250,190,50)";
             x.fillRect(-s, -s, s * 2, s * 2);
             x.shadowBlur = 0;
@@ -1462,7 +1530,7 @@ export default function Game() {
           const spin = Math.sin(fc * 0.03 + c.x) * 0.2;
           x.rotate(Math.PI / 4 + spin);
           if (c.active) {
-            x.shadowColor = "rgba(255,200,50,0.5)"; x.shadowBlur = isNight ? 12 : 8;
+            x.shadowColor = "rgba(255,200,50,0.5)"; x.shadowBlur = (isNight || cr === 6) ? 12 : 8;
             x.fillStyle = "rgb(250,190,50)";
             x.fillRect(-s, -s, s * 2, s * 2);
             x.shadowBlur = 0;
@@ -1476,6 +1544,83 @@ export default function Game() {
           x.restore();
         }});
       });
+
+      // Deep Space scenery — planets, asteroids, space station
+      if (cr === 6) {
+        // Planets — far background
+        planets.forEach(pl => {
+          const p = proj(pl.x, pl.y, pl.z, cam, vh);
+          if (!p) return;
+          const sr = Math.max(3, pl.radius * p.sc);
+          rn.push({ d: p.d + 500, f() { // +500 pushes behind everything
+            if (pl.type === "gas") {
+              // Jupiter-like gas giant with bands
+              const bands = [[180,140,80],[200,160,90],[160,120,70],[190,150,85],[170,130,75]];
+              for (let bi = 0; bi < bands.length; bi++) {
+                const by = p.sy - sr + (bi / bands.length) * sr * 2;
+                const bh = (sr * 2) / bands.length;
+                x.save(); x.beginPath(); x.arc(p.sx, p.sy, sr, 0, Math.PI * 2); x.clip();
+                x.fillStyle = `rgb(${bands[bi][0]},${bands[bi][1]},${bands[bi][2]})`;
+                x.fillRect(p.sx - sr, by, sr * 2, bh + 1);
+                x.restore();
+              }
+              // Ring (Saturn-like)
+              x.strokeStyle = "rgba(200,180,150,0.3)"; x.lineWidth = Math.max(2, sr * 0.08);
+              x.beginPath(); x.ellipse(p.sx, p.sy, sr * 1.5, sr * 0.3, 0.15, 0, Math.PI * 2); x.stroke();
+            } else {
+              // Blue-green rocky planet
+              x.fillStyle = "rgb(40,120,140)"; x.beginPath(); x.arc(p.sx, p.sy, sr, 0, Math.PI * 2); x.fill();
+              x.fillStyle = "rgba(60,150,160,0.5)"; x.beginPath(); x.arc(p.sx - sr * 0.2, p.sy + sr * 0.1, sr * 0.5, 0, Math.PI * 2); x.fill();
+              x.fillStyle = "rgba(230,240,250,0.7)"; x.beginPath(); x.arc(p.sx, p.sy - sr * 0.85, sr * 0.25, 0, Math.PI * 2); x.fill();
+            }
+          }});
+        });
+        // Asteroids
+        asteroids.forEach(ast => {
+          ast.rot += ast.rotSpeed;
+          const dist = Math.sqrt((ast.x - vw.x) ** 2 + (ast.z - vw.z) ** 2);
+          if (dist > 800) return;
+          const p = proj(ast.x, ast.y, ast.z, cam, vh);
+          if (!p || p.d > 600) return;
+          const sr = Math.max(2, ast.radius * p.sc);
+          rn.push({ d: p.d, f() {
+            x.save(); x.translate(p.sx, p.sy); x.rotate(ast.rot);
+            x.fillStyle = ast.color;
+            x.beginPath();
+            for (let v = 0; v < ast.nv; v++) {
+              const ang = (v / ast.nv) * Math.PI * 2;
+              const vr = sr * ast.verts[v];
+              if (v === 0) x.moveTo(Math.cos(ang) * vr, Math.sin(ang) * vr);
+              else x.lineTo(Math.cos(ang) * vr, Math.sin(ang) * vr);
+            }
+            x.closePath(); x.fill();
+            x.strokeStyle = "rgba(0,0,0,0.4)"; x.lineWidth = 1; x.stroke();
+            x.restore();
+          }});
+        });
+        // Space station
+        if (spaceStation) {
+          spaceStation.rot += 0.003;
+          const p = proj(spaceStation.x, spaceStation.y, spaceStation.z, cam, vh);
+          if (p && p.d < 500) {
+            const sr = Math.max(2, 20 * p.sc);
+            rn.push({ d: p.d, f() {
+              x.save(); x.translate(p.sx, p.sy); x.rotate(spaceStation.rot);
+              // Central body
+              x.fillStyle = "rgb(180,180,190)"; x.fillRect(-sr * 0.4, -sr, sr * 0.8, sr * 2);
+              // Solar panels
+              x.fillStyle = "rgb(40,60,120)";
+              x.fillRect(-sr * 2, -sr * 0.15, sr * 1.5, sr * 0.3);
+              x.fillRect(sr * 0.5, -sr * 0.15, sr * 1.5, sr * 0.3);
+              // Panel grid lines
+              x.strokeStyle = "rgba(80,120,200,0.4)"; x.lineWidth = 1;
+              for (let li = 0; li < 3; li++) { const lx = -sr * 2 + li * sr * 0.5; x.beginPath(); x.moveTo(lx, -sr * 0.15); x.lineTo(lx, sr * 0.15); x.stroke(); }
+              for (let li = 0; li < 3; li++) { const lx = sr * 0.5 + li * sr * 0.5; x.beginPath(); x.moveTo(lx, -sr * 0.15); x.lineTo(lx, sr * 0.15); x.stroke(); }
+              x.restore();
+            }});
+          }
+        }
+      }
 
       // Contrails — smoke trails behind planes
       rs.forEach(r => {
@@ -2230,6 +2375,7 @@ export default function Game() {
       { name: "OCEAN RUN", desc: "Skim the waves over endless open ocean", color: "#06b6d4", emoji: "\u{1F30A}" },
       { name: "VOLCANO", desc: "Fly over rivers of lava around an active volcano", color: "#dc2626", emoji: "\u{1F30B}" },
       { name: "ICE CAVERN", desc: "Fly through frozen valleys and ice arches", color: "#67e8f9", emoji: "❄️" },
+      { name: "DEEP SPACE", desc: "Dodge asteroids and race past planets in zero gravity", color: "#8b5cf6", emoji: "🚀" },
     ];
     return (
       <div style={{ width: "100%", minHeight: "100vh", background: bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: ft, color: "#e2e8f0", padding: "20px", textAlign: "center" }}>
