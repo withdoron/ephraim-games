@@ -1,5 +1,7 @@
 extends Node3D
 
+var player_plane: CharacterBody3D
+
 func _ready():
 	# Create the environment
 	var env = WorldEnvironment.new()
@@ -27,7 +29,7 @@ func _ready():
 	sun.shadow_enabled = true
 	add_child(sun)
 
-	# Ground plane — flat green terrain
+	# Ground plane — large flat terrain
 	var ground = MeshInstance3D.new()
 	ground.name = "Ground"
 	var ground_mesh = PlaneMesh.new()
@@ -39,10 +41,42 @@ func _ready():
 	ground.position.y = -20
 	add_child(ground)
 
+	# Race course
+	var course = Node3D.new()
+	course.name = "RaceCourse"
+	course.set_script(load("res://scripts/race_course.gd"))
+	add_child(course)
+
+	# HUD
+	var hud_node = CanvasLayer.new()
+	hud_node.name = "HUD"
+	hud_node.set_script(load("res://scripts/hud.gd"))
+	add_child(hud_node)
+
 	# Player plane
-	var plane = _create_player_plane()
-	plane.position = Vector3(0, 20, 0)
-	add_child(plane)
+	player_plane = _create_player_plane()
+	add_child(player_plane)
+
+	# Wire up references (deferred so course has generated gates)
+	call_deferred("_setup_race", course, hud_node)
+
+func _setup_race(course, hud_node):
+	# Give player references to course and HUD
+	player_plane.race_course = course
+	player_plane.hud = hud_node
+
+	# Position player behind the first gate, facing it
+	if course.gates.size() > 1:
+		var start = course.gates[0]
+		var next = course.gates[1]
+		var dir = (next - start).normalized()
+		# Place the player 30 units behind gate 0, facing toward it
+		player_plane.global_position = start - dir * 30.0 + Vector3.UP * 5.0
+		player_plane.look_at(start, Vector3.UP)
+
+	# Highlight the first gate
+	course.update_gate_colors(0)
+	hud_node.update_hud(0, course.total_laps, 0, course.num_gates)
 
 func _create_player_plane() -> CharacterBody3D:
 	var plane = CharacterBody3D.new()
@@ -55,7 +89,7 @@ func _create_player_plane() -> CharacterBody3D:
 	box.size = Vector3(1.5, 0.4, 3.0)
 	body.mesh = box
 	var body_mat = StandardMaterial3D.new()
-	body_mat.albedo_color = Color(0.2, 0.5, 1.0)  # Blue like P1
+	body_mat.albedo_color = Color(0.2, 0.5, 1.0)
 	body_mat.metallic = 0.3
 	body.material_override = body_mat
 	plane.add_child(body)
@@ -97,6 +131,8 @@ func _create_player_plane() -> CharacterBody3D:
 	var cam = Camera3D.new()
 	cam.name = "Camera3D"
 	cam.current = true
+	cam.fov = 75.0
+	cam.far = 2000.0
 	cam.position = Vector3(0, 3, 8)
 	cam.rotation.x = deg_to_rad(-10)
 	plane.add_child(cam)
@@ -109,7 +145,6 @@ func _create_player_plane() -> CharacterBody3D:
 	plane.add_child(col)
 
 	# Attach the player flight script
-	var script = load("res://scripts/player_plane.gd")
-	plane.set_script(script)
+	plane.set_script(load("res://scripts/player_plane.gd"))
 
 	return plane

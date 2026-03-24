@@ -15,6 +15,13 @@ var target_roll: float = 0.0
 var current_roll: float = 0.0
 var current_pitch: float = 0.0
 
+# Race state
+var current_gate: int = 0
+var current_lap: int = 0
+var race_finished: bool = false
+var race_course: Node3D = null  # Set by main_setup
+var hud: CanvasLayer = null  # Set by main_setup
+
 # Nodes
 @onready var mesh: MeshInstance3D = $MeshInstance3D
 @onready var camera: Camera3D = $Camera3D
@@ -85,8 +92,27 @@ func _physics_process(delta):
 	velocity = forward * current_speed
 	move_and_slide()
 
+	# Check gate passing
+	_check_gates()
+
 	# Update chase camera
 	_update_camera(delta)
+
+func _check_gates():
+	if not race_course or race_finished:
+		return
+	var gate_pos = race_course.get_gate_position(current_gate)
+	var dist = global_position.distance_to(gate_pos)
+	if dist < race_course.gate_size + 5.0:
+		current_gate += 1
+		if current_gate >= race_course.num_gates:
+			current_gate = 0
+			current_lap += 1
+			if current_lap >= race_course.total_laps:
+				race_finished = true
+		race_course.update_gate_colors(current_gate if not race_finished else -1)
+		if hud:
+			hud.update_hud(current_lap, race_course.total_laps, current_gate, race_course.num_gates, race_finished)
 
 func _update_camera(delta):
 	if not camera:
