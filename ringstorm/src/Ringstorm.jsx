@@ -27,8 +27,8 @@ export default function Game() {
   const [restartKey, setRestartKey] = useState(0);
   const [night, setNight] = useState(false);
   const [menuSel, setMenuSel] = useState(0);
-  const [gpMap, setGpMap] = useState({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 });
-  const [gpMap2, setGpMap2] = useState({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 });
+  const [gpMap, setGpMap] = useState({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5, brake: 6 });
+  const [gpMap2, setGpMap2] = useState({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5, brake: 6 });
   const gpMapRef = useRef(gpMap), gpMap2Ref = useRef(gpMap2);
   gpMapRef.current = gpMap; gpMap2Ref.current = gpMap2;
   const [remapping, setRemapping] = useState(null); // { player: 1|2, action: string } or null
@@ -38,6 +38,15 @@ export default function Game() {
   invY1Ref.current = invY1; invY2Ref.current = invY2;
   const pauseRef = useRef(false);
   pauseRef.current = paused;
+  const defaultSettings = {
+    playerSpeed: 6, npcSpeed: 5.5, boostMultiplier: 1.5, starMultiplier: 1.4, startSpeed: 1, brakeStrength: 0.5, minBrakeSpeed: 1,
+    deadzoneX: 0.3, deadzoneY: 0.4, stickSensitivity: 1.0, pitchSensitivity: 1.0, invertY_P1: false, invertY_P2: false,
+    turnRate: 50, pitchRate: 25, fireCooldown: 15, cubeRespawnRace: 300, cubeRespawnBattle: 180, crashRespawnTime: 80,
+    viewDistance: 900, trailLength: 30,
+  };
+  const [settings, setSettings] = useState({ ...defaultSettings });
+  const sRef = useRef(settings);
+  sRef.current = settings;
 
   function go(m, n) { setGm(m); setNp(n); setEd(null); setPaused(false); setSc(m); }
 
@@ -83,7 +92,7 @@ export default function Game() {
             const actions = ["fire","rollLeft","rollRight","pause","fireAlt"];
             if (s < 5) setRemapping({ player: 1, action: actions[s] });
             else if (s >= 5 && s < 10) setRemapping({ player: 2, action: actions[s - 5] });
-            else if (s === 10) { setGpMap({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 }); setGpMap2({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 }); }
+            else if (s === 10) { setGpMap({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5, brake: 6 }); setGpMap2({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5, brake: 6 }); }
             else if (s === 11) setInvY1(v => !v);
             else if (s === 12) setInvY2(v => !v);
             else if (s === 13) setSc("menu");
@@ -98,6 +107,7 @@ export default function Game() {
         else if (sc === "coursePick") setSc("pick");
         else if (sc === "ctrl") setSc("menu");
         else if (sc === "customize") setSc("menu");
+        else if (sc === "settings") setSc("menu");
         else if (sc === "raceEnd" || sc === "battleEnd") setSc("menu");
       }
       // Pause menu navigation
@@ -625,7 +635,7 @@ export default function Game() {
       }
       return {
         ...d, x: sx, y: sy2, z: sz,
-        p: 0, yw: syw, rl: 0, sp: 0, ms: d.npc ? 5.2 + Math.random() * 1 : 6,
+        p: 0, yw: syw, rl: 0, sp: 0, ms: d.npc ? sRef.current.npcSpeed + Math.random() * 1 : sRef.current.playerSpeed,
         th: 0, tp: 0, tr: 0, wp: null, wt: 0, st: 0, bt: 0,
         cr: 0, ct: 0, cx: 0, cy: 0, cz: 0, ep: [],
         ng: 0, lp: 0, fn: 0, ft: 0, fp: 0, hf: 0,
@@ -674,7 +684,7 @@ export default function Game() {
 
     function boom(p) {
       if (p.st > 0) return;
-      p.cr = 1; p.ct = iB ? 70 : 80; p.cx = p.x; p.cy = p.y; p.cz = p.z; p.ep = [];
+      p.cr = 1; p.ct = sRef.current.crashRespawnTime; p.cx = p.x; p.cy = p.y; p.cz = p.z; p.ep = [];
       for (let i = 0; i < 10; i++) p.ep.push({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 7, vy: Math.random() * 5 + 2, vz: (Math.random() - 0.5) * 7, s: 5 + Math.random() * 8, l: 25 + Math.random() * 30, ml: 55, t: 0 });
       for (let i = 0; i < 4; i++) p.ep.push({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 2, vy: Math.random() * 1.5, vz: (Math.random() - 0.5) * 2, s: 7 + Math.random() * 10, l: 30 + Math.random() * 20, ml: 50, t: 1 });
       for (let i = 0; i < 6; i++) p.ep.push({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 14, vy: Math.random() * 8 + 3, vz: (Math.random() - 0.5) * 14, s: 2 + Math.random() * 2, l: 10 + Math.random() * 10, ml: 20, t: 2 });
@@ -816,7 +826,7 @@ export default function Game() {
       cubes.forEach(c => {
         if (!c.active) return;
         if (Math.sqrt((r.x - c.x) ** 2 + (r.y - c.y) ** 2 + (r.z - c.z) ** 2) < 20) {
-          c.active = false; c.rt = iB ? 180 : 300;
+          c.active = false; c.rt = iB ? sRef.current.cubeRespawnBattle : sRef.current.cubeRespawnRace;
           if (r.wp === null) {
             const id = getItemForPos(r);
             r.wp = id; r.wt = id === "gun" ? 8 : 0;
@@ -969,9 +979,9 @@ export default function Game() {
       if (r.tumble > 0) r.tumble--;
 
       let ts = r.ms * (0.8 + r.ns * 0.2);
-      if (r.bt > 0) { ts = r.ms * 1.5; r.bt--; }
-      if (r.st > 0) { ts = Math.max(ts, r.ms * 1.4); r.st--; }
-      if (r.slBoost > 0) { ts = Math.max(ts, r.ms * 1.4); r.slBoost--; }
+      if (r.bt > 0) { ts = r.ms * sRef.current.boostMultiplier; r.bt--; }
+      if (r.st > 0) { ts = Math.max(ts, r.ms * sRef.current.starMultiplier); r.st--; }
+      if (r.slBoost > 0) { ts = Math.max(ts, r.ms * sRef.current.starMultiplier); r.slBoost--; }
       r.sp += (ts - r.sp) / 40;
 
       const { sy, sp2, cy } = moveRacer(r, 1 / 60);
@@ -1000,8 +1010,8 @@ export default function Game() {
       getCubes(r);
     }
 
-    function updatePlayer(r, c, ks, uK, dK, lK, rK, upK, dvK, fK) {
-      const dt = 1 / 60;
+    function updatePlayer(r, c, ks, uK, dK, lK, rK, fK, gps) {
+      const dt = 1 / 60, S = sRef.current;
       if (r.fn) { c.lx += (r.x - c.lx) * dt * 3; c.ly += (r.y - c.ly) * dt * 3; c.lz += (r.z - c.lz) * dt * 3; return; }
       if (r.cr) {
         r.ct--; r.ep.forEach(e => { e.x += e.vx * 0.3; e.y += e.vy * 0.3; e.z += e.vz * 0.3; e.vy -= 0.04; e.l--; e.s *= 0.98; });
@@ -1013,53 +1023,53 @@ export default function Game() {
 
       r.th = 1;
       let ts = 1 + r.th * (r.ms - 1);
-      if (r.bt > 0) { ts = r.ms * 1.5; r.bt--; }
-      if (r.st > 0) { ts = Math.max(ts, r.ms * 1.4); r.st--; }
-      if (r.slBoost > 0) { ts = Math.max(ts, r.ms * 1.4); r.slBoost--; }
+      if (r.bt > 0) { ts = r.ms * S.boostMultiplier; r.bt--; }
+      if (r.st > 0) { ts = Math.max(ts, r.ms * S.starMultiplier); r.st--; }
+      if (r.slBoost > 0) { ts = Math.max(ts, r.ms * S.starMultiplier); r.slBoost--; }
       r.sp += (ts - r.sp) * dt * 2;
 
+      // Brake — keyboard (Shift for P1, Period for P2) or gamepad LT
+      const brakeP = ks["ShiftLeft"] || (lK === "ArrowLeft" && ks["Period"]) || gps.brake;
+      if (brakeP) { r.sp = r.sp - (r.sp - S.minBrakeSpeed) * S.brakeStrength * dt * 4; if (r.sp < S.minBrakeSpeed) r.sp = S.minBrakeSpeed; }
+
       const tMulP = r.tumble > 0 ? 0.2 : 1;
-      if (ks[lK]) r.tr = 50 * D * tMulP; else if (ks[rK]) r.tr = -50 * D * tMulP; else r.tr = 0;
-      if (ks[uK]) r.tp = 25 * D * tMulP; else if (ks[dK]) r.tp = -20 * D * tMulP; else r.tp *= 0.9;
-      // Analog stick override — calibrated, inverted, proportional, center snap
-      const isP1 = lK === "KeyA";
-      const gpPad = isP1 ? ks._gp1 : lK === "ArrowLeft" ? ks._gp2 : null;
-      const gpBM = isP1 ? ks._bm1 : lK === "ArrowLeft" ? ks._bm2 : null;
-      if (gpPad) {
-        const glx = isP1 ? ks._gp1X : ks._gp2X;
-        const gly = isP1 ? ks._gp1Y : ks._gp2Y;
-        if (glx !== undefined) {
-          if (Math.abs(glx) > 0.3) r.tr = -glx * 50 * D * tMulP; else r.tr = 0;
-          if (Math.abs(gly) > 0.4) r.tp = -gly * 25 * D * tMulP; else r.tp *= 0.7;
-        }
-      }
+      // Turn — keyboard digital, gamepad analog (gamepad overrides if active)
+      let turnIn = 0;
+      if (ks[lK]) turnIn = 1; else if (ks[rK]) turnIn = -1;
+      if (gps.x !== 0) turnIn = -gps.x;
+      r.tr = turnIn * S.turnRate * D * tMulP;
+      // Pitch — keyboard digital, gamepad analog
+      let pitchIn = 0;
+      if (ks[uK]) pitchIn = 1; else if (ks[dK]) pitchIn = -0.8;
+      if (gps.y !== 0) pitchIn = -gps.y;
+      if (pitchIn !== 0) r.tp = pitchIn * S.pitchRate * D * tMulP;
+      else if (turnIn === 0 && gps.x === 0) r.tp *= 0.7; else r.tp *= 0.9;
+
       r.rl += (r.tr - r.rl) * dt * 4;
       r.p += (r.tp - r.p) * dt * 3;
       r.yw += (-r.rl * 2.2 * (r.sp / r.ms)) * dt;
       if (r.tumble > 0) r.tumble--;
-      // Barrel roll detection — double-tap left or right (keyboard)
+      // Barrel roll — double-tap keyboard
       if (r.trickTimer > 0) r.trickTimer--;
       if (ks[lK] && !ks["_bl" + lK]) { ks["_bl" + lK] = 1; if (fc - r.lastLF < 18 && r.trickTimer <= 0 && r.trickFrame <= 0) { r.trickFrame = 30; r.trickDir = 1; r.trickRoll = 0; } r.lastLF = fc; }
       if (!ks[lK]) ks["_bl" + lK] = 0;
       if (ks[rK] && !ks["_bl" + rK]) { ks["_bl" + rK] = 1; if (fc - r.lastRF < 18 && r.trickTimer <= 0 && r.trickFrame <= 0) { r.trickFrame = 30; r.trickDir = -1; r.trickRoll = 0; } r.lastRF = fc; }
       if (!ks[rK]) ks["_bl" + rK] = 0;
-      // Barrel roll from controller — configurable buttons
-      if (gpPad && gpBM && r.trickTimer <= 0 && r.trickFrame <= 0) {
-        if (gpPad.buttons[gpBM.rollLeft]?.pressed && !ks._gpBL) { ks._gpBL = true; r.trickFrame = 30; r.trickDir = 1; r.trickRoll = 0; }
-        if (gpPad.buttons[gpBM.rollRight]?.pressed && !ks._gpBR) { ks._gpBR = true; r.trickFrame = 30; r.trickDir = -1; r.trickRoll = 0; }
-      }
-      if (gpPad && gpBM) { if (!gpPad.buttons[gpBM.rollLeft]?.pressed) ks._gpBL = false; if (!gpPad.buttons[gpBM.rollRight]?.pressed) ks._gpBR = false; }
+      // Barrel roll — gamepad buttons with edge detection on racer
+      if (gps.rollR && !r._prevRollR && r.trickTimer <= 0 && r.trickFrame <= 0) { r.trickFrame = 30; r.trickDir = -1; r.trickRoll = 0; }
+      if (gps.rollL && !r._prevRollL && r.trickTimer <= 0 && r.trickFrame <= 0) { r.trickFrame = 30; r.trickDir = 1; r.trickRoll = 0; }
+      r._prevRollR = gps.rollR; r._prevRollL = gps.rollL;
       if (r.trickFrame > 0) { r.trickRoll += (Math.PI * 2 / 30) * r.trickDir; r.trickFrame--; if (r.trickFrame <= 0) { r.trickRoll = 0; r.trickTimer = 60; } }
 
       const { sy, sp2, cy } = moveRacer(r, dt);
       checkSlipstream(r);
 
-      // Fire weapon — cooldown-based (15 frame minimum between fires)
+      // Fire weapon — cooldown, keyboard OR gamepad
       if (!r._fireCD) r._fireCD = 0;
       if (r._fireCD > 0) r._fireCD--;
-      const wantFire = ks[fK];
+      const wantFire = ks[fK] || gps.fire;
       if (wantFire && r._fireCD <= 0 && r.wp) {
-        r._fireCD = 15;
+        r._fireCD = S.fireCooldown;
         if (r.wp === "gun") {
           for (let i = -1; i <= 1; i += 2) pj.push({ x: r.x + i * 3, y: r.y, z: r.z, vx: sy * 20, vy: sp2 * 20, vz: cy * 20, l: 60, s: 2, cl: "#fbbf24", o: r, hm: 0 });
           r.wt--; if (r.wt <= 0) r.wp = null;
@@ -1189,7 +1199,7 @@ export default function Game() {
       }
 
       const rn = [];
-      const stp = TS / GR, vD = 900;
+      const stp = TS / GR, vD = sRef.current.viewDistance;
       let shakeX = 0, shakeY = 0;
       if (vw.cr && vw.ct > (iB ? 55 : 65)) { shakeX = (Math.random() - 0.5) * 8; shakeY = (Math.random() - 0.5) * 8; }
       if (earthquake.active && earthquake.intensity > 0) { shakeX += (Math.random() - 0.5) * 12 * earthquake.intensity; shakeY += (Math.random() - 0.5) * 12 * earthquake.intensity; }
@@ -2188,35 +2198,45 @@ export default function Game() {
     }
 
     function mainUpdate() {
-      // Gamepad polling — calibrated axes, configurable buttons, invert Y
+      // Gamepad polling — completely separate from keyboard state
+      const S = sRef.current;
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-      const gp1 = gamepads[0] || null, gp2 = gamepads[1] || null;
-      const dzX = 0.3, dzY = 0.4, bm1 = gpMapRef.current, bm2 = gpMap2Ref.current;
-      ky.current._gp1 = gp1; ky.current._gp2 = gp2;
-      ky.current._bm1 = bm1; ky.current._bm2 = bm2;
-      // Calibrate on first detection
-      if (gp1 && !ky.current._gp1Cal) ky.current._gp1Cal = { x: gp1.axes[0], y: gp1.axes[1] };
-      if (gp2 && !ky.current._gp2Cal) ky.current._gp2Cal = { x: gp2.axes[0], y: gp2.axes[1] };
-      if (gp1) {
-        const cal = ky.current._gp1Cal;
-        const lx = gp1.axes[0] - cal.x, ly0 = gp1.axes[1] - cal.y;
-        const ly = invY1Ref.current ? -ly0 : ly0;
-        ky.current._gp1X = lx; ky.current._gp1Y = ly;
-        if (Math.abs(lx) > dzX) { ky.current[lx < 0 ? "KeyA" : "KeyD"] = true; }
-        if (Math.abs(ly) > dzY) { ky.current[ly < 0 ? "KeyW" : "KeyS"] = true; }
-        ky.current["Space"] = ky.current["Space"] || gp1.buttons[bm1.fire]?.pressed || gp1.buttons[bm1.fireAlt]?.pressed;
-        if (gp1.buttons[bm1.pause]?.pressed) ky.current["KeyP"] = true;
+      const gp1Raw = gamepads[0] || null, gp2Raw = gamepads[1] || null;
+      const bm1 = gpMapRef.current, bm2 = gpMap2Ref.current;
+      if (gp1Raw && !ky.current._gp1Cal) ky.current._gp1Cal = { x: gp1Raw.axes[0], y: gp1Raw.axes[1] };
+      if (gp2Raw && !ky.current._gp2Cal) ky.current._gp2Cal = { x: gp2Raw.axes[0], y: gp2Raw.axes[1] };
+      const gp1S = { x: 0, y: 0, fire: false, rollL: false, rollR: false, pause: false, brake: false };
+      const gp2S = { x: 0, y: 0, fire: false, rollL: false, rollR: false, pause: false, brake: false };
+      if (gp1Raw) {
+        const cal = ky.current._gp1Cal || { x: 0, y: 0 };
+        let rx = gp1Raw.axes[0] - cal.x, ry = gp1Raw.axes[1] - cal.y;
+        if (Math.abs(rx) < S.deadzoneX) rx = 0; else rx *= S.stickSensitivity;
+        if (Math.abs(ry) < S.deadzoneY) ry = 0; else ry *= S.pitchSensitivity;
+        if (S.invertY_P1) ry = -ry;
+        gp1S.x = rx; gp1S.y = ry;
+        gp1S.fire = gp1Raw.buttons[bm1.fire]?.pressed || gp1Raw.buttons[bm1.fireAlt]?.pressed || false;
+        gp1S.rollL = gp1Raw.buttons[bm1.rollLeft]?.pressed || false;
+        gp1S.rollR = gp1Raw.buttons[bm1.rollRight]?.pressed || false;
+        gp1S.pause = gp1Raw.buttons[bm1.pause]?.pressed || false;
+        gp1S.brake = gp1Raw.buttons[bm1.brake || 6]?.pressed || false;
       }
-      if (gp2) {
-        const cal = ky.current._gp2Cal;
-        const lx = gp2.axes[0] - cal.x, ly0 = gp2.axes[1] - cal.y;
-        const ly = invY2Ref.current ? -ly0 : ly0;
-        ky.current._gp2X = lx; ky.current._gp2Y = ly;
-        if (Math.abs(lx) > dzX) { ky.current[lx < 0 ? "ArrowLeft" : "ArrowRight"] = true; }
-        if (Math.abs(ly) > dzY) { ky.current[ly < 0 ? "ArrowUp" : "ArrowDown"] = true; }
-        ky.current["ShiftRight"] = ky.current["ShiftRight"] || gp2.buttons[bm2.fire]?.pressed || gp2.buttons[bm2.fireAlt]?.pressed;
-        if (gp2.buttons[bm2.pause]?.pressed) ky.current["KeyP"] = true;
+      if (gp2Raw) {
+        const cal = ky.current._gp2Cal || { x: 0, y: 0 };
+        let rx = gp2Raw.axes[0] - cal.x, ry = gp2Raw.axes[1] - cal.y;
+        if (Math.abs(rx) < S.deadzoneX) rx = 0; else rx *= S.stickSensitivity;
+        if (Math.abs(ry) < S.deadzoneY) ry = 0; else ry *= S.pitchSensitivity;
+        if (S.invertY_P2) ry = -ry;
+        gp2S.x = rx; gp2S.y = ry;
+        gp2S.fire = gp2Raw.buttons[bm2.fire]?.pressed || gp2Raw.buttons[bm2.fireAlt]?.pressed || false;
+        gp2S.rollL = gp2Raw.buttons[bm2.rollLeft]?.pressed || false;
+        gp2S.rollR = gp2Raw.buttons[bm2.rollRight]?.pressed || false;
+        gp2S.pause = gp2Raw.buttons[bm2.pause]?.pressed || false;
+        gp2S.brake = gp2Raw.buttons[bm2.brake || 6]?.pressed || false;
       }
+      // Pause — keyboard or gamepad with edge detection
+      const gpPauseNow = gp1S.pause || gp2S.pause;
+      if (gpPauseNow && !ky.current._prevGpPause) ky.current["KeyP"] = true;
+      ky.current._prevGpPause = gpPauseNow;
       if (ky.current["KeyP"] && !ky.current._pauseCD) {
         ky.current._pauseCD = true;
         setTimeout(() => { ky.current._pauseCD = false; }, 300);
@@ -2224,7 +2244,7 @@ export default function Game() {
       }
       if (pauseRef.current) return;
       if (cd > 0) { cd--; fc++; return; }
-      if (!started) { started = 1; rs.forEach(r => { r.th = 1; r.sp = iB ? 0 : 1; }); }
+      if (!started) { started = 1; rs.forEach(r => { r.th = 1; r.sp = iB ? 0 : sRef.current.startSpeed; }); }
       rt++;
 
       // Replay recording — capture positions after first racer finishes
@@ -2269,12 +2289,12 @@ export default function Game() {
       }
 
       const pl = rs.filter(r => !r.npc);
-      if (pl[0]) updatePlayer(pl[0], cm[0], ky.current, "KeyW", "KeyS", "KeyA", "KeyD", "Space", "KeyQ", "Space");
-      if (pl[1] && i2) updatePlayer(pl[1], cm[1], ky.current, "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Slash", "Period", "ShiftRight");
+      if (pl[0]) updatePlayer(pl[0], cm[0], ky.current, "KeyW", "KeyS", "KeyA", "KeyD", "Space", gp1S);
+      if (pl[1] && i2) updatePlayer(pl[1], cm[1], ky.current, "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftRight", gp2S);
       rs.filter(r => r.npc).forEach(r => updateNPC(r));
 
       // Contrails — record positions every 3 frames
-      if (fc % 3 === 0) rs.forEach(r => { if (!r.cr && !r.fn) { r.trail.push({ x: r.x, y: r.y, z: r.z }); if (r.trail.length > 30) r.trail.shift(); } });
+      if (fc % 3 === 0) { const tl = sRef.current.trailLength; rs.forEach(r => { if (!r.cr && !r.fn && tl > 0) { r.trail.push({ x: r.x, y: r.y, z: r.z }); while (r.trail.length > tl) r.trail.shift(); } }); }
       // Tick announcements
       announcements.forEach(a => { a.timer--; a.y += 0.5; });
       announcements = announcements.filter(a => a.timer > 0);
@@ -2523,6 +2543,7 @@ export default function Game() {
         <button onClick={() => { setGm("battle"); setSc("pick"); }} style={{ ...btn("BATTLE", "#ef4444"), border: menuSel === 1 ? "2px solid #fff" : "2px solid #ef444466" }}>BATTLE</button>
         <button onClick={() => setSc("ctrl")} style={{ padding: "14px", background: "rgba(255,255,255,0.03)", border: menuSel === 2 ? "2px solid #fff" : "1px solid rgba(255,255,255,0.12)", borderRadius: "14px", color: "#94a3b8", fontSize: "16px", fontWeight: 700, cursor: "pointer", letterSpacing: "2px" }}>CONTROLS</button>
         <button onClick={() => setSc("customize")} style={{ padding: "14px", background: "rgba(139,92,246,0.06)", border: menuSel === 3 ? "2px solid #fff" : "1px solid rgba(139,92,246,0.25)", borderRadius: "14px", color: "#a78bfa", fontSize: "16px", fontWeight: 700, cursor: "pointer", letterSpacing: "2px" }}>🎮 CUSTOMIZE</button>
+        <button onClick={() => setSc("settings")} style={{ padding: "14px", background: "rgba(100,116,139,0.06)", border: menuSel === 4 ? "2px solid #fff" : "1px solid rgba(100,116,139,0.25)", borderRadius: "14px", color: "#94a3b8", fontSize: "16px", fontWeight: 700, cursor: "pointer", letterSpacing: "2px" }}>⚙️ SETTINGS</button>
       </div>
       <p style={{ fontSize: "10px", color: "#4a5568", marginTop: "20px" }}>A flying racing game by Ephraim</p>
     </div>
@@ -2610,11 +2631,71 @@ export default function Game() {
     </div>
   );
 
+  // SETTINGS — dev tuning panel with sliders
+  if (sc === "settings") {
+    const sldr = (label, key, min, max, step) => (
+      <div key={key} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "3px 0" }}>
+        <span style={{ color: "#94a3b8", fontSize: "11px", minWidth: "110px", textAlign: "right" }}>{label}</span>
+        <input type="range" min={min} max={max} step={step} value={settings[key]}
+          onChange={e => setSettings(s => ({ ...s, [key]: typeof s[key] === "boolean" ? e.target.checked : parseFloat(e.target.value) }))}
+          style={{ flex: 1, accentColor: "#8b5cf6" }} />
+        <span style={{ color: "#e2e8f0", fontSize: "11px", minWidth: "36px", textAlign: "left", fontWeight: 700 }}>{settings[key]}</span>
+      </div>
+    );
+    const tog = (label, key) => (
+      <div key={key} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "3px 0" }}>
+        <span style={{ color: "#94a3b8", fontSize: "11px", minWidth: "110px", textAlign: "right" }}>{label}</span>
+        <button onClick={() => setSettings(s => ({ ...s, [key]: !s[key] }))}
+          style={{ padding: "3px 12px", background: settings[key] ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.03)", border: settings[key] ? "1px solid #22c55e" : "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: settings[key] ? "#22c55e" : "#64748b", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
+          {settings[key] ? "ON" : "OFF"}
+        </button>
+      </div>
+    );
+    const section = (title, color) => <div style={{ color, fontWeight: 900, fontSize: "12px", marginTop: "10px", marginBottom: "2px", letterSpacing: "2px" }}>{title}</div>;
+    return (
+      <div style={{ width: "100%", minHeight: "100vh", background: bg, display: "flex", flexDirection: "column", alignItems: "center", fontFamily: ft, color: "#e2e8f0", padding: "16px", textAlign: "center", overflowY: "auto" }}>
+        <h2 style={{ fontSize: "22px", fontWeight: 900, marginBottom: "4px", color: "#94a3b8" }}>⚙️ SETTINGS</h2>
+        <p style={{ fontSize: "10px", color: "#64748b", marginBottom: "8px" }}>Tune game values in real time · Changes apply instantly</p>
+        <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: "12px", padding: "12px 18px", maxWidth: "420px", width: "95vw" }}>
+          {section("SPEED", "#fbbf24")}
+          {sldr("Player Speed", "playerSpeed", 2, 12, 0.5)}
+          {sldr("NPC Speed", "npcSpeed", 2, 12, 0.5)}
+          {sldr("Boost ×", "boostMultiplier", 1.1, 2.5, 0.1)}
+          {sldr("Star ×", "starMultiplier", 1.1, 2.5, 0.1)}
+          {sldr("Start Speed", "startSpeed", 0, 3, 0.5)}
+          {sldr("Brake Strength", "brakeStrength", 0.1, 0.9, 0.05)}
+          {sldr("Min Brake Speed", "minBrakeSpeed", 0, 3, 0.5)}
+          {section("CONTROLLER", "#8b5cf6")}
+          {sldr("Deadzone X", "deadzoneX", 0.05, 0.6, 0.05)}
+          {sldr("Deadzone Y", "deadzoneY", 0.05, 0.6, 0.05)}
+          {sldr("Stick Sensitivity", "stickSensitivity", 0.3, 2.0, 0.1)}
+          {sldr("Pitch Sensitivity", "pitchSensitivity", 0.3, 2.0, 0.1)}
+          {tog("P1 Invert Y", "invertY_P1")}
+          {tog("P2 Invert Y", "invertY_P2")}
+          {section("GAMEPLAY", "#22c55e")}
+          {sldr("Turn Rate", "turnRate", 20, 80, 5)}
+          {sldr("Pitch Rate", "pitchRate", 10, 40, 5)}
+          {sldr("Fire Cooldown", "fireCooldown", 5, 30, 1)}
+          {sldr("Cube Respawn (Race)", "cubeRespawnRace", 60, 600, 30)}
+          {sldr("Cube Respawn (Battle)", "cubeRespawnBattle", 60, 600, 30)}
+          {sldr("Crash Respawn", "crashRespawnTime", 30, 150, 10)}
+          {section("VISUALS", "#3b82f6")}
+          {sldr("View Distance", "viewDistance", 400, 1500, 100)}
+          {sldr("Trail Length", "trailLength", 0, 60, 5)}
+        </div>
+        <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+          <button onClick={() => setSettings({ ...defaultSettings })} style={{ padding: "8px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#64748b", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>Reset All to Default</button>
+          <button onClick={() => setSc("menu")} style={{ padding: "8px 16px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", color: "#e2e8f0", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>Back to Menu</button>
+        </div>
+      </div>
+    );
+  }
+
   // CUSTOMIZE — controller button remapping + invert Y
   if (sc === "customize") {
     const BN = { 0:"A", 1:"B", 2:"X", 3:"Y", 4:"LB", 5:"RB", 6:"LT", 7:"RT", 8:"View", 9:"Start", 10:"L3", 11:"R3", 12:"Up", 13:"Down", 14:"Left", 15:"Right" };
-    const acts = ["fire","rollLeft","rollRight","pause","fireAlt"];
-    const actNames = { fire: "Weapon", rollLeft: "Roll Left", rollRight: "Roll Right", pause: "Pause", fireAlt: "Weapon 2" };
+    const acts = ["fire","rollLeft","rollRight","pause","fireAlt","brake"];
+    const actNames = { fire: "Weapon", rollLeft: "Roll Left", rollRight: "Roll Right", pause: "Pause", fireAlt: "Weapon 2", brake: "Brake" };
     const row = (act, map, pn, idx) => (
       <div key={act + pn} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
         <span style={{ color: "#94a3b8", fontSize: "12px" }}>{actNames[act]}</span>
@@ -2639,12 +2720,12 @@ export default function Game() {
           </div>
         </div>
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginBottom: "16px" }}>
-          <button onClick={() => { setGpMap({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 }); setGpMap2({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 }); }}
+          <button onClick={() => { setGpMap({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5, brake: 6 }); setGpMap2({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5, brake: 6 }); }}
             style={{ padding: "8px 16px", background: "rgba(255,255,255,0.03)", border: menuSel === 10 ? "2px solid #fff" : "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#64748b", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>Reset Defaults</button>
-          <button onClick={() => setInvY1(v => !v)}
-            style={{ padding: "8px 16px", background: invY1 ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.03)", border: menuSel === 11 ? "2px solid #fff" : (invY1 ? "1px solid #22c55e" : "1px solid rgba(255,255,255,0.1)"), borderRadius: "8px", color: invY1 ? "#22c55e" : "#64748b", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>P1 Invert Y: {invY1 ? "ON" : "OFF"}</button>
-          <button onClick={() => setInvY2(v => !v)}
-            style={{ padding: "8px 16px", background: invY2 ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.03)", border: menuSel === 12 ? "2px solid #fff" : (invY2 ? "1px solid #22c55e" : "1px solid rgba(255,255,255,0.1)"), borderRadius: "8px", color: invY2 ? "#22c55e" : "#64748b", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>P2 Invert Y: {invY2 ? "ON" : "OFF"}</button>
+          <button onClick={() => setSettings(s => ({ ...s, invertY_P1: !s.invertY_P1 }))}
+            style={{ padding: "8px 16px", background: settings.invertY_P1 ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.03)", border: menuSel === 11 ? "2px solid #fff" : (settings.invertY_P1 ? "1px solid #22c55e" : "1px solid rgba(255,255,255,0.1)"), borderRadius: "8px", color: settings.invertY_P1 ? "#22c55e" : "#64748b", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>P1 Invert Y: {settings.invertY_P1 ? "ON" : "OFF"}</button>
+          <button onClick={() => setSettings(s => ({ ...s, invertY_P2: !s.invertY_P2 }))}
+            style={{ padding: "8px 16px", background: settings.invertY_P2 ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.03)", border: menuSel === 12 ? "2px solid #fff" : (settings.invertY_P2 ? "1px solid #22c55e" : "1px solid rgba(255,255,255,0.1)"), borderRadius: "8px", color: settings.invertY_P2 ? "#22c55e" : "#64748b", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>P2 Invert Y: {settings.invertY_P2 ? "ON" : "OFF"}</button>
         </div>
         <button onClick={() => setSc("menu")} style={{ padding: "10px 24px", background: "rgba(255,255,255,0.05)", border: menuSel === 13 ? "2px solid #fff" : "1px solid rgba(255,255,255,0.15)", borderRadius: "10px", color: "#e2e8f0", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>Back to Menu</button>
       </div>
