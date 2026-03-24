@@ -1,92 +1,197 @@
 extends CanvasLayer
-# Main menu — ported from Ringstorm.jsx menu screens
+# Full menu system — main menu, mode select, course select, pause, results
+# Ported from Ringstorm.jsx menu screens
 
-signal start_race(num_players: int)
+signal start_race(num_players: int, course_idx: int)
 signal start_battle(num_players: int)
+signal resume_game
+signal restart_game
+signal quit_to_menu
 
-var container: VBoxContainer
+var current_screen: String = "main"
+var selected_mode: String = ""
+var selected_players: int = 1
+var container: Control
+var bg: ColorRect
+
+const COURSES = [
+	{ "name": "GRAND CANYON", "emoji": "🏜️", "desc": "Race through desert canyons", "color": Color(0.98, 0.45, 0.09) },
+	{ "name": "ISLAND SKIES", "emoji": "🏝️", "desc": "Fly between floating islands", "color": Color(0.13, 0.77, 0.37) },
+	{ "name": "MOUNTAIN PASS", "emoji": "🏔️", "desc": "Navigate narrow mountain valleys", "color": Color(0.23, 0.51, 0.96) },
+	{ "name": "OCEAN RUN", "emoji": "🌊", "desc": "Skim the waves and dodge arches", "color": Color(0.02, 0.71, 0.83) },
+	{ "name": "VOLCANO", "emoji": "🌋", "desc": "Race around an active volcano", "color": Color(0.86, 0.15, 0.15) },
+	{ "name": "ICE CAVERN", "emoji": "❄️", "desc": "Fly through frozen valleys", "color": Color(0.4, 0.91, 0.98) },
+	{ "name": "DEEP SPACE", "emoji": "🚀", "desc": "Dodge asteroids in zero gravity", "color": Color(0.55, 0.36, 0.96) },
+]
 
 func _ready():
-	# Dark background
-	var bg = ColorRect.new()
+	layer = 10  # Above game
+	bg = ColorRect.new()
 	bg.color = Color(0.04, 0.06, 0.1, 1.0)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
-
-	# Center container
-	container = VBoxContainer.new()
-	container.set_anchors_preset(Control.PRESET_CENTER)
-	container.offset_left = -160
-	container.offset_right = 160
-	container.offset_top = -220
-	container.offset_bottom = 220
-	container.add_theme_constant_override("separation", 12)
+	container = Control.new()
+	container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(container)
+	_show_main_menu()
 
-	# Title
-	var title = Label.new()
-	title.text = "RINGSTORM"
-	title.add_theme_font_size_override("font_size", 42)
-	title.add_theme_color_override("font_color", Color(1.0, 0.75, 0.15))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	container.add_child(title)
+func _clear():
+	for child in container.get_children():
+		child.queue_free()
 
-	# Subtitle
-	var sub = Label.new()
-	sub.text = "RACERS"
-	sub.add_theme_font_size_override("font_size", 18)
-	sub.add_theme_color_override("font_color", Color(0.58, 0.64, 0.72))
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	container.add_child(sub)
+func _show_main_menu():
+	_clear()
+	current_screen = "main"
+	var vbox = _centered_vbox()
+	_add_title(vbox, "RINGSTORM", 42, Color(1.0, 0.75, 0.15))
+	_add_title(vbox, "RACERS", 18, Color(0.58, 0.64, 0.72))
+	_add_title(vbox, "A flying racing game by Ephraim", 11, Color(0.3, 0.35, 0.42))
+	_add_spacer(vbox, 30)
+	_add_btn(vbox, "RACE", Color(1.0, 0.75, 0.15), func(): _show_player_select("race"))
+	_add_btn(vbox, "BATTLE", Color(0.94, 0.27, 0.27), func(): _show_player_select("battle"))
+	_add_spacer(vbox, 10)
+	_add_btn(vbox, "CONTROLS", Color(0.58, 0.64, 0.72), func(): _show_controls(), true)
 
-	# Credit
-	var credit = Label.new()
-	credit.text = "A flying racing game by Ephraim"
-	credit.add_theme_font_size_override("font_size", 11)
-	credit.add_theme_color_override("font_color", Color(0.3, 0.35, 0.42))
-	credit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	container.add_child(credit)
+func _show_player_select(mode: String):
+	_clear()
+	selected_mode = mode
+	current_screen = "players"
+	var vbox = _centered_vbox()
+	_add_title(vbox, mode.to_upper() + " MODE", 28, Color(1.0, 0.75, 0.15))
+	_add_spacer(vbox, 20)
+	_add_btn(vbox, "1 PLAYER", Color(0.23, 0.51, 0.96), func(): _on_players_selected(1))
+	_add_btn(vbox, "2 PLAYERS", Color(0.94, 0.27, 0.27), func(): _on_players_selected(2))
+	_add_spacer(vbox, 15)
+	_add_btn(vbox, "BACK", Color(0.5, 0.55, 0.65), func(): _show_main_menu(), true)
 
-	# Spacer
-	var spacer = Control.new()
-	spacer.custom_minimum_size = Vector2(0, 25)
-	container.add_child(spacer)
+func _on_players_selected(n: int):
+	selected_players = n
+	if selected_mode == "race":
+		_show_course_select()
+	else:
+		start_battle.emit(n)
 
-	# Buttons
-	_add_button("RACE — 1 PLAYER", Color(1.0, 0.75, 0.15), func(): start_race.emit(1))
-	_add_button("RACE — 2 PLAYER", Color(1.0, 0.75, 0.15), func(): _coming_soon())
-	_add_button("BATTLE — 1 PLAYER", Color(0.94, 0.27, 0.27), func(): _coming_soon())
-	_add_button("BATTLE — 2 PLAYER", Color(0.94, 0.27, 0.27), func(): _coming_soon())
+func _show_course_select():
+	_clear()
+	current_screen = "course"
+	var vbox = _centered_vbox()
+	_add_title(vbox, "SELECT COURSE", 24, Color(1.0, 0.75, 0.15))
+	_add_spacer(vbox, 10)
+	for i in range(COURSES.size()):
+		var c = COURSES[i]
+		var idx = i  # Capture for lambda
+		_add_btn(vbox, c["emoji"] + " " + c["name"], c["color"],
+			func(): start_race.emit(selected_players, idx), false, 14)
+	_add_spacer(vbox, 10)
+	_add_btn(vbox, "BACK", Color(0.5, 0.55, 0.65), func(): _show_player_select(selected_mode), true)
 
-func _add_button(text: String, color: Color, callback: Callable):
-	var btn = Button.new()
-	btn.text = text
-	btn.custom_minimum_size = Vector2(320, 48)
-	btn.add_theme_font_size_override("font_size", 17)
-	btn.add_theme_color_override("font_color", color)
-	# Style the button background
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(color.r, color.g, color.b, 0.08)
-	style.border_color = Color(color.r, color.g, color.b, 0.3)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(10)
-	btn.add_theme_stylebox_override("normal", style)
-	var hover = style.duplicate()
-	hover.bg_color = Color(color.r, color.g, color.b, 0.15)
-	hover.border_color = Color(color.r, color.g, color.b, 0.6)
-	btn.add_theme_stylebox_override("hover", hover)
-	var pressed = style.duplicate()
-	pressed.bg_color = Color(color.r, color.g, color.b, 0.25)
-	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.pressed.connect(callback)
-	container.add_child(btn)
+func _show_controls():
+	_clear()
+	current_screen = "controls"
+	var vbox = _centered_vbox()
+	_add_title(vbox, "CONTROLS", 28, Color(0.58, 0.64, 0.72))
+	_add_spacer(vbox, 15)
+	_add_title(vbox, "KEYBOARD", 16, Color(0.23, 0.51, 0.96))
+	_add_title(vbox, "W/S — Rise / Dive", 13, Color(0.6, 0.65, 0.7))
+	_add_title(vbox, "A/D — Turn Left / Right", 13, Color(0.6, 0.65, 0.7))
+	_add_title(vbox, "Space — Fire Weapon", 13, Color(0.6, 0.65, 0.7))
+	_add_title(vbox, "Shift — Brake", 13, Color(0.6, 0.65, 0.7))
+	_add_title(vbox, "Double-tap A/D — Barrel Roll", 13, Color(0.6, 0.65, 0.7))
+	_add_title(vbox, "P — Pause", 13, Color(0.6, 0.65, 0.7))
+	_add_spacer(vbox, 10)
+	_add_title(vbox, "XBOX CONTROLLER", 16, Color(0.13, 0.77, 0.37))
+	_add_title(vbox, "Left Stick — Fly", 13, Color(0.6, 0.65, 0.7))
+	_add_title(vbox, "A / RB — Fire Weapon", 13, Color(0.6, 0.65, 0.7))
+	_add_title(vbox, "B — Roll Right · X — Roll Left", 13, Color(0.6, 0.65, 0.7))
+	_add_title(vbox, "LT — Brake · Start — Pause", 13, Color(0.6, 0.65, 0.7))
+	_add_spacer(vbox, 15)
+	_add_btn(vbox, "BACK", Color(0.5, 0.55, 0.65), func(): _show_main_menu(), true)
 
-func _coming_soon():
-	# TODO: implement 2P and battle modes
-	print("Coming soon!")
+func show_pause_menu():
+	visible = true
+	bg.color.a = 0.85
+	_clear()
+	current_screen = "pause"
+	var vbox = _centered_vbox()
+	_add_title(vbox, "PAUSED", 36, Color(0.58, 0.64, 0.72))
+	_add_spacer(vbox, 25)
+	_add_btn(vbox, "RESUME", Color(0.13, 0.77, 0.37), func(): resume_game.emit())
+	_add_btn(vbox, "RESTART", Color(1.0, 0.75, 0.15), func(): restart_game.emit())
+	_add_btn(vbox, "MAIN MENU", Color(0.94, 0.27, 0.27), func(): quit_to_menu.emit())
+
+func show_results(finish_order: Array):
+	visible = true
+	bg.color.a = 0.9
+	_clear()
+	current_screen = "results"
+	var vbox = _centered_vbox()
+	_add_title(vbox, "RACE RESULTS", 32, Color(1.0, 0.75, 0.15))
+	_add_spacer(vbox, 15)
+	for i in range(finish_order.size()):
+		var r = finish_order[i]
+		var name_text = r.racer_name if r.has_method("get") and "racer_name" in r else r.name
+		var suffix = ["st", "nd", "rd", "th", "th"][min(i, 4)]
+		var time_text = "%.1fs" % (r.finish_time / 60.0)
+		var color = Color(1.0, 0.85, 0.2) if i == 0 else Color(0.7, 0.7, 0.75) if i == 1 else Color(0.5, 0.55, 0.6)
+		_add_title(vbox, str(i + 1) + suffix + "  " + name_text + "  " + time_text, 18, color)
+	_add_spacer(vbox, 20)
+	_add_btn(vbox, "MAIN MENU", Color(0.58, 0.64, 0.72), func(): quit_to_menu.emit())
 
 func hide_menu():
 	visible = false
 
 func show_menu():
 	visible = true
+	bg.color.a = 1.0
+	_show_main_menu()
+
+# --- UI helpers ---
+
+func _centered_vbox() -> VBoxContainer:
+	var vbox = VBoxContainer.new()
+	vbox.set_anchors_preset(Control.PRESET_CENTER)
+	vbox.offset_left = -170; vbox.offset_right = 170
+	vbox.offset_top = -250; vbox.offset_bottom = 250
+	vbox.add_theme_constant_override("separation", 8)
+	container.add_child(vbox)
+	return vbox
+
+func _add_title(parent: Control, text: String, size: int, color: Color):
+	var l = Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	parent.add_child(l)
+
+func _add_spacer(parent: Control, height: float):
+	var s = Control.new()
+	s.custom_minimum_size = Vector2(0, height)
+	parent.add_child(s)
+
+func _add_btn(parent: Control, text: String, color: Color, callback: Callable, small: bool = false, font_size: int = 0):
+	var btn = Button.new()
+	btn.text = text
+	btn.custom_minimum_size = Vector2(340, 36 if small else 44)
+	btn.add_theme_font_size_override("font_size", font_size if font_size > 0 else (13 if small else 17))
+	btn.add_theme_color_override("font_color", color)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(color.r, color.g, color.b, 0.08)
+	style.border_color = Color(color.r, color.g, color.b, 0.3)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(8)
+	btn.add_theme_stylebox_override("normal", style)
+	var hover = style.duplicate()
+	hover.bg_color = Color(color.r, color.g, color.b, 0.18)
+	hover.border_color = Color(color.r, color.g, color.b, 0.6)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.pressed.connect(callback)
+	parent.add_child(btn)
+
+# Handle P key or Start button for pause
+func _unhandled_input(event):
+	if current_screen == "pause":
+		if event is InputEventKey and event.keycode == KEY_P and event.pressed:
+			resume_game.emit()
+		elif event is InputEventJoypadButton and event.button_index == JOY_BUTTON_START and event.pressed:
+			resume_game.emit()

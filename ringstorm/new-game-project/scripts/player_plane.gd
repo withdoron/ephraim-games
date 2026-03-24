@@ -47,6 +47,9 @@ var last_right_frame: int = 0
 var lives: int = 3
 var kills: int = 0
 
+# Weapon system reference
+var weapon_system: Node3D = null
+
 # Trail
 var trail: Array = []
 
@@ -199,14 +202,29 @@ func _physics_process(delta):
 		fire_cooldown -= 1
 	if want_fire and fire_cooldown <= 0 and weapon != "":
 		fire_cooldown = int(S.fire_cooldown)
-		if weapon == "boost":
-			boost_timer = 120
-			weapon = ""
-		elif weapon == "star":
-			star_timer = 180
-			weapon = ""
-		else:
-			weapon = ""  # TODO: implement projectile weapons
+		match weapon:
+			"gun":
+				if weapon_system: weapon_system.fire_gun(self)
+				weapon_ammo -= 1
+				if weapon_ammo <= 0: weapon = ""
+			"missile":
+				if weapon_system: weapon_system.fire_missile(self)
+				weapon = ""
+			"boost":
+				boost_timer = 120; weapon = ""
+				AudioManager.play("boost")
+			"star":
+				star_timer = 180; weapon = ""
+				AudioManager.play("star_power")
+			"flares":
+				if weapon_system: weapon_system.fire_flares(self)
+				weapon = ""
+			"lightning":
+				if weapon_system: weapon_system.drop_lightning(self)
+				weapon = ""
+			"tornado":
+				if weapon_system: weapon_system.drop_tornado(self)
+				weapon = ""
 
 	# Gate check
 	_check_gate()
@@ -220,10 +238,15 @@ func _physics_process(delta):
 	# Camera
 	_update_camera(delta)
 
+	# Engine pitch based on speed
+	AudioManager.set_engine_pitch(0.8 + current_speed / max_speed * 0.6)
+
 	# Update HUD
 	if hud and race_manager:
 		var pos = race_manager.get_race_position(self)
 		hud.update_hud(current_lap, Settings.total_laps, current_gate, Settings.num_gates, race_finished)
+		hud.update_position(pos)
+		hud.update_weapon(weapon)
 
 # Edge detection state
 var _prev_left: bool = false
