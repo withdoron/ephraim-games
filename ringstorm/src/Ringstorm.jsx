@@ -26,10 +26,74 @@ export default function Game() {
   const [paused, setPaused] = useState(false);
   const [restartKey, setRestartKey] = useState(0);
   const [night, setNight] = useState(false);
+  const [menuSel, setMenuSel] = useState(0);
+  const [gpMap, setGpMap] = useState({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 });
+  const [gpMap2, setGpMap2] = useState({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 });
+  const gpMapRef = useRef(gpMap), gpMap2Ref = useRef(gpMap2);
+  gpMapRef.current = gpMap; gpMap2Ref.current = gpMap2;
+  const [remapping, setRemapping] = useState(null); // { player: 1|2, action: string } or null
   const pauseRef = useRef(false);
   pauseRef.current = paused;
 
   function go(m, n) { setGm(m); setNp(n); setEd(null); setPaused(false); setSc(m); }
+
+  // Reset menu selection on screen change
+  useEffect(() => { setMenuSel(0); }, [sc]);
+
+  // Gamepad menu navigation — polls controller for menu input
+  useEffect(() => {
+    if (sc === "race" || sc === "battle") return;
+    let cd = 0;
+    const iv = setInterval(() => {
+      if (cd > 0) { cd--; return; }
+      // Remapping mode: capture next button press
+      if (remapping) {
+        const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+        const gp = gps[remapping.player === 2 ? 1 : 0];
+        if (!gp) return;
+        for (let bi = 0; bi < gp.buttons.length; bi++) {
+          if (gp.buttons[bi]?.pressed) {
+            const setter = remapping.player === 2 ? setGpMap2 : setGpMap;
+            setter(m => ({ ...m, [remapping.action]: bi }));
+            setRemapping(null);
+            cd = 5;
+            return;
+          }
+        }
+        return;
+      }
+      const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+      const gp = gps[0] || gps[1];
+      if (!gp) return;
+      const ly = gp.axes[1], aBtn = gp.buttons[0]?.pressed, bBtn = gp.buttons[1]?.pressed;
+      if (ly < -0.5) { setMenuSel(s => Math.max(0, s - 1)); cd = 3; }
+      if (ly > 0.5) { setMenuSel(s => s + 1); cd = 3; }
+      if (aBtn) {
+        cd = 5;
+        if (sc === "menu") { const acts = [() => { setGm("race"); setSc("pick"); }, () => { setGm("battle"); setSc("pick"); }, () => setSc("ctrl")]; setMenuSel(s => { if (acts[s]) acts[s](); return s; }); }
+        else if (sc === "pick") { setMenuSel(s => { if (s === 0) { setNp(1); if (gm === "race") setSc("coursePick"); else go(gm, 1); } else if (s === 1) { setNp(2); if (gm === "race") setSc("coursePick"); else go(gm, 2); } else if (s === 2) setSc("menu"); return s; }); }
+        else if (sc === "coursePick") { setMenuSel(s => { if (s < 7) { setCr(s); go("race", np); } else if (s === 7) setNight(n => !n); else if (s === 8) setSc("pick"); return s; }); }
+        else if (sc === "ctrl") { setMenuSel(s => { if (s === 0) setSc("menu"); return s; }); }
+        else if (sc === "raceEnd" || sc === "battleEnd") { setSc("menu"); }
+      }
+      if (bBtn) {
+        cd = 5;
+        if (sc === "pick") setSc("menu");
+        else if (sc === "coursePick") setSc("pick");
+        else if (sc === "ctrl") setSc("menu");
+        else if (sc === "raceEnd" || sc === "battleEnd") setSc("menu");
+      }
+      // Pause menu navigation
+      if (paused) {
+        if (aBtn) {
+          cd = 5;
+          setMenuSel(s => { if (s === 0) setPaused(false); else if (s === 1) { setPaused(false); setRestartKey(k => k + 1); } else if (s === 2) { setPaused(false); setSc("menu"); } return s; });
+        }
+        if (bBtn) { cd = 5; setPaused(false); }
+      }
+    }, 100);
+    return () => clearInterval(iv);
+  }, [sc, gm, np, paused, remapping]);
 
   // Game engine
   useEffect(() => {
@@ -935,12 +999,13 @@ export default function Game() {
       const tMulP = r.tumble > 0 ? 0.2 : 1;
       if (ks[lK]) r.tr = 50 * D * tMulP; else if (ks[rK]) r.tr = -50 * D * tMulP; else r.tr = 0;
       if (ks[uK]) r.tp = 25 * D * tMulP; else if (ks[dK]) r.tp = -20 * D * tMulP; else r.tp *= 0.9;
-      // Analog stick override — proportional turning from controller
+      // Analog stick override — proportional turning from controller with center snap
       const gpPad = lK === "KeyA" ? ks._gp1 : lK === "ArrowLeft" ? ks._gp2 : null;
+      const gpBM = lK === "KeyA" ? ks._bm1 : lK === "ArrowLeft" ? ks._bm2 : null;
       if (gpPad) {
-        const glx = gpPad.axes[0], gly = gpPad.axes[1], gdz = 0.2;
-        if (Math.abs(glx) > gdz) r.tr = -glx * 50 * D * tMulP;
-        if (Math.abs(gly) > gdz) r.tp = -gly * 25 * D * tMulP;
+        const glx = gpPad.axes[0], gly = gpPad.axes[1], gdz = 0.3;
+        if (Math.abs(glx) > gdz) r.tr = -glx * 50 * D * tMulP; else r.tr = 0;
+        if (Math.abs(gly) > gdz) r.tp = -gly * 25 * D * tMulP; else r.tp *= 0.8;
       }
       r.rl += (r.tr - r.rl) * dt * 4;
       r.p += (r.tp - r.p) * dt * 3;
@@ -952,12 +1017,12 @@ export default function Game() {
       if (!ks[lK]) ks["_bl" + lK] = 0;
       if (ks[rK] && !ks["_bl" + rK]) { ks["_bl" + rK] = 1; if (fc - r.lastRF < 18 && r.trickTimer <= 0 && r.trickFrame <= 0) { r.trickFrame = 30; r.trickDir = -1; r.trickRoll = 0; } r.lastRF = fc; }
       if (!ks[rK]) ks["_bl" + rK] = 0;
-      // Barrel roll from controller — B = right roll, X = left roll
-      if (gpPad && r.trickTimer <= 0 && r.trickFrame <= 0) {
-        if (gpPad.buttons[2]?.pressed && !ks._gpBL) { ks._gpBL = true; r.trickFrame = 30; r.trickDir = 1; r.trickRoll = 0; }
-        if (gpPad.buttons[1]?.pressed && !ks._gpBR) { ks._gpBR = true; r.trickFrame = 30; r.trickDir = -1; r.trickRoll = 0; }
+      // Barrel roll from controller — configurable buttons
+      if (gpPad && gpBM && r.trickTimer <= 0 && r.trickFrame <= 0) {
+        if (gpPad.buttons[gpBM.rollLeft]?.pressed && !ks._gpBL) { ks._gpBL = true; r.trickFrame = 30; r.trickDir = 1; r.trickRoll = 0; }
+        if (gpPad.buttons[gpBM.rollRight]?.pressed && !ks._gpBR) { ks._gpBR = true; r.trickFrame = 30; r.trickDir = -1; r.trickRoll = 0; }
       }
-      if (gpPad) { if (!gpPad.buttons[2]?.pressed) ks._gpBL = false; if (!gpPad.buttons[1]?.pressed) ks._gpBR = false; }
+      if (gpPad && gpBM) { if (!gpPad.buttons[gpBM.rollLeft]?.pressed) ks._gpBL = false; if (!gpPad.buttons[gpBM.rollRight]?.pressed) ks._gpBR = false; }
       if (r.trickFrame > 0) { r.trickRoll += (Math.PI * 2 / 30) * r.trickDir; r.trickFrame--; if (r.trickFrame <= 0) { r.trickRoll = 0; r.trickTimer = 60; } }
 
       const { sy, sp2, cy } = moveRacer(r, dt);
@@ -2095,25 +2160,25 @@ export default function Game() {
     }
 
     function mainUpdate() {
-      // Gamepad polling — inject controller state into key map
+      // Gamepad polling — store analog values separately, use configurable button map
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
       const gp1 = gamepads[0] || null, gp2 = gamepads[1] || null;
-      const gpDZ = 0.2;
+      const gpDZ = 0.3, bm1 = gpMapRef.current, bm2 = gpMap2Ref.current;
+      ky.current._gp1 = gp1; ky.current._gp2 = gp2;
+      ky.current._bm1 = bm1; ky.current._bm2 = bm2;
       if (gp1) {
         const lx = gp1.axes[0], ly = gp1.axes[1];
         if (Math.abs(lx) > gpDZ) { ky.current[lx < 0 ? "KeyA" : "KeyD"] = true; }
         if (Math.abs(ly) > gpDZ) { ky.current[ly < 0 ? "KeyW" : "KeyS"] = true; }
-        ky.current["Space"] = ky.current["Space"] || gp1.buttons[0]?.pressed || gp1.buttons[5]?.pressed;
-        if (gp1.buttons[9]?.pressed) ky.current["KeyP"] = true;
-        ky.current._gp1 = gp1; // store raw gamepad for analog
+        ky.current["Space"] = ky.current["Space"] || gp1.buttons[bm1.fire]?.pressed || gp1.buttons[bm1.fireAlt]?.pressed;
+        if (gp1.buttons[bm1.pause]?.pressed) ky.current["KeyP"] = true;
       }
       if (gp2) {
         const lx = gp2.axes[0], ly = gp2.axes[1];
         if (Math.abs(lx) > gpDZ) { ky.current[lx < 0 ? "ArrowLeft" : "ArrowRight"] = true; }
         if (Math.abs(ly) > gpDZ) { ky.current[ly < 0 ? "ArrowUp" : "ArrowDown"] = true; }
-        ky.current["ShiftRight"] = ky.current["ShiftRight"] || gp2.buttons[0]?.pressed || gp2.buttons[5]?.pressed;
-        if (gp2.buttons[9]?.pressed) ky.current["KeyP"] = true;
-        ky.current._gp2 = gp2;
+        ky.current["ShiftRight"] = ky.current["ShiftRight"] || gp2.buttons[bm2.fire]?.pressed || gp2.buttons[bm2.fireAlt]?.pressed;
+        if (gp2.buttons[bm2.pause]?.pressed) ky.current["KeyP"] = true;
       }
       if (ky.current["KeyP"] && !ky.current._pauseCD) {
         ky.current._pauseCD = true;
@@ -2403,9 +2468,9 @@ export default function Game() {
       <h1 style={{ fontSize: "clamp(32px,7vw,48px)", fontWeight: 900, letterSpacing: "-2px", margin: "0 0 2px", background: "linear-gradient(135deg,#fbbf24,#ef4444,#f97316)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>RINGSTORM</h1>
       <h2 style={{ fontSize: "clamp(13px,2.5vw,20px)", fontWeight: 400, letterSpacing: "6px", textTransform: "uppercase", color: "#94a3b8", margin: "0 0 32px" }}>RACERS</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "min(280px,85vw)" }}>
-        <button onClick={() => { setGm("race"); setSc("pick"); }} style={btn("RACE", "#fbbf24")}>RACE</button>
-        <button onClick={() => { setGm("battle"); setSc("pick"); }} style={btn("BATTLE", "#ef4444")}>BATTLE</button>
-        <button onClick={() => setSc("ctrl")} style={{ padding: "14px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "14px", color: "#94a3b8", fontSize: "16px", fontWeight: 700, cursor: "pointer", letterSpacing: "2px" }}>CONTROLS</button>
+        <button onClick={() => { setGm("race"); setSc("pick"); }} style={{ ...btn("RACE", "#fbbf24"), border: menuSel === 0 ? "2px solid #fff" : "2px solid #fbbf2466" }}>RACE</button>
+        <button onClick={() => { setGm("battle"); setSc("pick"); }} style={{ ...btn("BATTLE", "#ef4444"), border: menuSel === 1 ? "2px solid #fff" : "2px solid #ef444466" }}>BATTLE</button>
+        <button onClick={() => setSc("ctrl")} style={{ padding: "14px", background: "rgba(255,255,255,0.03)", border: menuSel === 2 ? "2px solid #fff" : "1px solid rgba(255,255,255,0.12)", borderRadius: "14px", color: "#94a3b8", fontSize: "16px", fontWeight: 700, cursor: "pointer", letterSpacing: "2px" }}>CONTROLS</button>
       </div>
       <p style={{ fontSize: "10px", color: "#4a5568", marginTop: "20px" }}>A flying racing game by Ephraim</p>
     </div>
@@ -2418,10 +2483,10 @@ export default function Game() {
       <h2 style={{ fontSize: "28px", fontWeight: 900, margin: "0 0 4px", color: gm === "race" ? "#fbbf24" : "#ef4444" }}>{gm === "race" ? "RACE" : "BATTLE"}</h2>
       <p style={{ fontSize: "12px", color: "#64748b", marginBottom: "24px" }}>{gm === "race" ? LAPS + " laps · Fly through gates" : "3 lives · Last plane flying"}</p>
       <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
-        <button onClick={() => { setNp(1); if (gm === "race") setSc("coursePick"); else go(gm, 1); }} style={{ padding: "16px 32px", background: "linear-gradient(135deg,#3b82f6,#2563eb)", border: "none", borderRadius: "12px", color: "#fff", fontSize: "18px", fontWeight: 900, cursor: "pointer" }}>1 PLAYER</button>
-        <button onClick={() => { setNp(2); if (gm === "race") setSc("coursePick"); else go(gm, 2); }} style={{ padding: "16px 32px", background: "linear-gradient(135deg,#ef4444,#dc2626)", border: "none", borderRadius: "12px", color: "#fff", fontSize: "18px", fontWeight: 900, cursor: "pointer" }}>2 PLAYER</button>
+        <button onClick={() => { setNp(1); if (gm === "race") setSc("coursePick"); else go(gm, 1); }} style={{ padding: "16px 32px", background: "linear-gradient(135deg,#3b82f6,#2563eb)", border: menuSel === 0 ? "2px solid #fff" : "none", borderRadius: "12px", color: "#fff", fontSize: "18px", fontWeight: 900, cursor: "pointer" }}>1 PLAYER</button>
+        <button onClick={() => { setNp(2); if (gm === "race") setSc("coursePick"); else go(gm, 2); }} style={{ padding: "16px 32px", background: "linear-gradient(135deg,#ef4444,#dc2626)", border: menuSel === 1 ? "2px solid #fff" : "none", borderRadius: "12px", color: "#fff", fontSize: "18px", fontWeight: 900, cursor: "pointer" }}>2 PLAYER</button>
       </div>
-      <button onClick={() => setSc("menu")} style={{ padding: "8px 20px", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#64748b", fontSize: "12px", cursor: "pointer" }}>Back</button>
+      <button onClick={() => setSc("menu")} style={{ padding: "8px 20px", background: "none", border: menuSel === 2 ? "2px solid #fff" : "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#64748b", fontSize: "12px", cursor: "pointer" }}>Back</button>
     </div>
   );
 
@@ -2442,7 +2507,7 @@ export default function Game() {
         <p style={{ fontSize: "11px", color: "#64748b", marginBottom: "20px" }}>{LAPS} laps · {np === 2 ? "2 players" : "1 player"}</p>
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center", marginBottom: "20px", width: "min(560px,95vw)" }}>
           {courses.map((c, i) => (
-            <button key={i} onClick={() => { setCr(i); go("race", np); }} style={{ padding: "16px", background: `linear-gradient(135deg,${c.color}18,${c.color}08)`, border: `2px solid ${c.color}55`, borderRadius: "14px", color: "#e2e8f0", cursor: "pointer", flex: "1", minWidth: "140px", maxWidth: "260px", textAlign: "center" }}>
+            <button key={i} onClick={() => { setCr(i); go("race", np); }} style={{ padding: "16px", background: `linear-gradient(135deg,${c.color}18,${c.color}08)`, border: menuSel === i ? "2px solid #fff" : `2px solid ${c.color}55`, borderRadius: "14px", color: "#e2e8f0", cursor: "pointer", flex: "1", minWidth: "140px", maxWidth: "260px", textAlign: "center" }}>
               <div style={{ fontSize: "32px", marginBottom: "6px" }}>{c.emoji}</div>
               <div style={{ fontSize: "14px", fontWeight: 900, color: c.color, letterSpacing: "1px", marginBottom: "4px" }}>{c.name}</div>
               <div style={{ fontSize: "10px", color: "#94a3b8", lineHeight: "1.4" }}>{c.desc}</div>
@@ -2450,9 +2515,9 @@ export default function Game() {
           ))}
         </div>
         <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "12px" }}>
-          <button onClick={() => setNight(n => !n)} style={{ padding: "8px 16px", background: night ? "rgba(251,191,36,0.15)" : "rgba(255,255,255,0.03)", border: night ? "2px solid #fbbf24" : "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: night ? "#fbbf24" : "#64748b", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>{night ? "🌙 NIGHT MODE ON" : "🌙 NIGHT MODE"}</button>
+          <button onClick={() => setNight(n => !n)} style={{ padding: "8px 16px", background: night ? "rgba(251,191,36,0.15)" : "rgba(255,255,255,0.03)", border: menuSel === 7 ? "2px solid #fff" : (night ? "2px solid #fbbf24" : "1px solid rgba(255,255,255,0.1)"), borderRadius: "8px", color: night ? "#fbbf24" : "#64748b", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>{night ? "🌙 NIGHT MODE ON" : "🌙 NIGHT MODE"}</button>
         </div>
-        <button onClick={() => setSc("pick")} style={{ padding: "8px 20px", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#64748b", fontSize: "12px", cursor: "pointer" }}>Back</button>
+        <button onClick={() => setSc("pick")} style={{ padding: "8px 20px", background: "none", border: menuSel === 8 ? "2px solid #fff" : "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#64748b", fontSize: "12px", cursor: "pointer" }}>Back</button>
       </div>
     );
   }
@@ -2485,8 +2550,23 @@ export default function Game() {
       </div>
       <div style={{ background: "rgba(0,0,0,0.25)", borderRadius: "12px", padding: "12px 20px", border: "2px solid #8b5cf644", marginBottom: "12px", width: "min(460px,90vw)", textAlign: "left" }}>
         <div style={{ color: "#8b5cf6", fontWeight: 900, fontSize: "13px", marginBottom: "6px" }}>🎮 CONTROLLER</div>
-        <div style={{ fontSize: "11px", color: "#94a3b8", lineHeight: "1.8" }}>Left Stick = Fly · A / RB = Weapon · B = Roll Right · X = Roll Left · Start = Pause</div>
-        <div style={{ fontSize: "10px", color: "#64748b", marginTop: "4px" }}>Xbox controllers supported — plug in via USB or Bluetooth. P1 = first controller, P2 = second.</div>
+        <div style={{ fontSize: "11px", color: "#94a3b8", lineHeight: "1.8" }}>Left Stick = Fly · Navigate menus with stick + A/B</div>
+        <div style={{ fontSize: "10px", color: "#64748b", marginTop: "6px", marginBottom: "8px" }}>Xbox controllers — USB or Bluetooth. P1 = 1st controller, P2 = 2nd.</div>
+        {remapping ? (
+          <div style={{ padding: "8px", background: "rgba(139,92,246,0.15)", borderRadius: "8px", textAlign: "center" }}>
+            <div style={{ fontSize: "12px", color: "#a78bfa", fontWeight: 700 }}>Press a button for: {remapping.action.toUpperCase()}</div>
+            <button onClick={() => setRemapping(null)} style={{ marginTop: "6px", padding: "4px 12px", background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", color: "#64748b", fontSize: "10px", cursor: "pointer" }}>Cancel</button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+            {["fire","rollLeft","rollRight","pause","fireAlt"].map(act => (
+              <button key={act} onClick={() => setRemapping({ player: 1, action: act })} style={{ padding: "3px 8px", background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)", borderRadius: "6px", color: "#a78bfa", fontSize: "10px", cursor: "pointer" }}>
+                {act === "fire" ? "Weapon" : act === "rollLeft" ? "Roll L" : act === "rollRight" ? "Roll R" : act === "pause" ? "Pause" : "Weapon2"}: B{gpMap[act]}
+              </button>
+            ))}
+            <button onClick={() => { setGpMap({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 }); setGpMap2({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 }); }} style={{ padding: "3px 8px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#64748b", fontSize: "10px", cursor: "pointer" }}>Reset</button>
+          </div>
+        )}
       </div>
       <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "20px" }}>🟨 Gold cubes = powerups · 🔫 Gun · 🚀 Boost · 💥 Homing Missile · ⭐ Star · 🛡️ Flares · ⚡ Lightning Storm · 🌪️ Tornado — pulls racers in and throws them backward</div>
       <button onClick={() => setSc("menu")} style={{ padding: "12px 28px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "10px", color: "#e2e8f0", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>Back to Menu</button>
@@ -2558,11 +2638,11 @@ export default function Game() {
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.75)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: ft, zIndex: 50 }}>
           <h2 style={{ fontSize: "36px", fontWeight: 900, color: "#e2e8f0", marginBottom: "32px" }}>PAUSED</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "200px" }}>
-            <button onClick={() => setPaused(false)} style={{ padding: "14px", background: "linear-gradient(135deg, #22c55e, #16a34a)", border: "none", borderRadius: "10px", color: "#fff", fontSize: "16px", fontWeight: 900, cursor: "pointer" }}>RESUME</button>
-            <button onClick={() => { setPaused(false); setRestartKey(k => k + 1); }} style={{ padding: "14px", background: "linear-gradient(135deg, #f59e0b, #d97706)", border: "none", borderRadius: "10px", color: "#fff", fontSize: "16px", fontWeight: 900, cursor: "pointer" }}>RESTART</button>
-            <button onClick={() => { setPaused(false); setSc("menu"); }} style={{ padding: "14px", background: "linear-gradient(135deg, #ef4444, #dc2626)", border: "none", borderRadius: "10px", color: "#fff", fontSize: "16px", fontWeight: 900, cursor: "pointer" }}>MAIN MENU</button>
+            <button onClick={() => setPaused(false)} style={{ padding: "14px", background: "linear-gradient(135deg, #22c55e, #16a34a)", border: menuSel === 0 ? "2px solid #fff" : "none", borderRadius: "10px", color: "#fff", fontSize: "16px", fontWeight: 900, cursor: "pointer" }}>RESUME</button>
+            <button onClick={() => { setPaused(false); setRestartKey(k => k + 1); }} style={{ padding: "14px", background: "linear-gradient(135deg, #f59e0b, #d97706)", border: menuSel === 1 ? "2px solid #fff" : "none", borderRadius: "10px", color: "#fff", fontSize: "16px", fontWeight: 900, cursor: "pointer" }}>RESTART</button>
+            <button onClick={() => { setPaused(false); setSc("menu"); }} style={{ padding: "14px", background: "linear-gradient(135deg, #ef4444, #dc2626)", border: menuSel === 2 ? "2px solid #fff" : "none", borderRadius: "10px", color: "#fff", fontSize: "16px", fontWeight: 900, cursor: "pointer" }}>MAIN MENU</button>
           </div>
-          <p style={{ fontSize: "10px", color: "#64748b", marginTop: "16px" }}>Press P to resume</p>
+          <p style={{ fontSize: "10px", color: "#64748b", marginTop: "16px" }}>Press P or Start to resume</p>
         </div>
       )}
     </div>
