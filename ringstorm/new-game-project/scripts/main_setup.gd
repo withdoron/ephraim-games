@@ -146,55 +146,10 @@ func _create_environment(course_idx: int):
 	# Course-specific terrain objects
 	_add_course_terrain(course_idx)
 
-func _add_course_terrain(course_idx: int):
-	# Simplified terrain per course — just colored boxes for atmosphere
-	match course_idx:
-		0:  # Canyon — tall brown pillars flanking course
-			_scatter_boxes(12, Color(0.5, 0.3, 0.15), Vector3(15, 60, 15), 80.0, 250.0, -20.0)
-		1:  # Islands — green floating platforms
-			_scatter_boxes(8, Color(0.2, 0.5, 0.2), Vector3(20, 3, 20), 100.0, 200.0, 30.0)
-		2:  # Mountain — grey mountains creating corridors
-			_scatter_boxes(10, Color(0.4, 0.42, 0.4), Vector3(20, 80, 20), 80.0, 220.0, -20.0)
-		4:  # Volcano — central cone
-			var cone = MeshInstance3D.new()
-			var cmesh = CylinderMesh.new()
-			cmesh.top_radius = 5.0; cmesh.bottom_radius = 60.0; cmesh.height = 100.0
-			cone.mesh = cmesh
-			var cmat = StandardMaterial3D.new()
-			cmat.albedo_color = Color(0.2, 0.12, 0.08)
-			cmat.emission_enabled = true; cmat.emission = Color(0.8, 0.2, 0.05); cmat.emission_energy_multiplier = 0.5
-			cone.material_override = cmat
-			cone.position = Vector3(0, 30, 0)
-			add_child(cone); game_nodes.append(cone)
-		5:  # Ice — blue-tinted boxes
-			_scatter_boxes(8, Color(0.6, 0.7, 0.85), Vector3(18, 50, 18), 80.0, 200.0, -20.0)
-		6:  # Space — asteroid spheres
-			for i in range(25):
-				var ast = MeshInstance3D.new()
-				var smesh = SphereMesh.new()
-				smesh.radius = 3.0 + randf() * 8.0
-				smesh.height = smesh.radius * 2
-				ast.mesh = smesh
-				var amat = StandardMaterial3D.new()
-				amat.albedo_color = Color(0.4 + randf() * 0.2, 0.35 + randf() * 0.15, 0.3 + randf() * 0.1)
-				ast.material_override = amat
-				var ang = randf() * TAU
-				var dist = 150.0 + randf() * 200.0
-				ast.position = Vector3(cos(ang) * dist, 20.0 + randf() * 60.0, sin(ang) * dist)
-				add_child(ast); game_nodes.append(ast)
-
-func _scatter_boxes(count: int, color: Color, box_size: Vector3, min_dist: float, max_dist: float, base_y: float):
-	for i in range(count):
-		var m = MeshInstance3D.new()
-		var bx = BoxMesh.new()
-		bx.size = box_size
-		m.mesh = bx
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = color
-		m.material_override = mat
-		var ang = randf() * TAU
-		var dist = min_dist + randf() * (max_dist - min_dist)
-		m.position = Vector3(cos(ang) * dist, base_y + box_size.y / 2.0, sin(ang) * dist)
+func _add_course_terrain(_course_idx: int):
+	# Terrain simplified to just colored ground for now
+	# TODO: add course-specific obstacles (canyon walls, islands, etc.) once core racing is solid
+	pass
 		add_child(m); game_nodes.append(m)
 
 func _create_course(course_idx: int):
@@ -305,10 +260,10 @@ func _setup_race(is_battle: bool):
 		var ox = -5.0 if col == 0 else 5.0
 		var oz = -row_i * 12.0 - 20.0
 		r.global_position = start + perp * ox + dir * oz + Vector3.UP * 3.0
-		var face_yaw = atan2(dir.x, dir.z)
-		if "yaw_angle" in r:
-			r.yaw_angle = face_yaw
-		r.rotation.y = -face_yaw
+		# Face toward first gate using look_at
+		var look_target = start + Vector3.UP * 3.0
+		if r.global_position.distance_to(look_target) > 1.0:
+			r.look_at(look_target, Vector3.UP)
 	player_plane.race_course = course
 	player_plane.race_manager = race_mgr
 	player_plane.hud = hud_node

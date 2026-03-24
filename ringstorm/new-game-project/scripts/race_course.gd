@@ -80,9 +80,12 @@ func create_gate_visuals():
 		ring_node.material_override = mat
 
 		ring_node.global_position = gate_pos
+		# Face toward next gate, then stand the torus upright
 		var dir = (next_pos - gate_pos).normalized()
 		if dir.length() > 0.01:
 			ring_node.look_at(gate_pos + dir, Vector3.UP)
+		# TorusMesh lies flat in XZ by default — rotate 90° on local X to stand vertical
+		ring_node.rotate_object_local(Vector3.RIGHT, PI / 2.0)
 
 		add_child(ring_node)
 		gate_meshes.append(ring_node)

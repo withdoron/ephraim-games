@@ -139,19 +139,20 @@ func _physics_process(delta):
 		if current_speed < S.min_brake_speed:
 			current_speed = S.min_brake_speed
 
-	# --- TURN & PITCH --- ported from lines 1022-1035
+	# --- TURN & PITCH --- simplified for Godot native transforms
 	var tumble_mul = 0.2 if tumble_timer > 0 else 1.0
-	target_roll = turn_input * deg_to_rad(S.turn_rate) * tumble_mul
-	if pitch_input != 0:
-		target_pitch = pitch_input * deg_to_rad(S.pitch_rate) * tumble_mul
-	elif turn_input == 0:
-		target_pitch *= 0.7  # Decay pitch when no input
-	else:
-		target_pitch *= 0.9
-
-	roll_value += (target_roll - roll_value) * delta * 4.0
-	pitch_angle += (target_pitch - pitch_angle) * delta * 3.0
-	yaw_angle += (-roll_value * 2.2 * (current_speed / max_speed)) * delta
+	# Yaw: turn based on input
+	var yaw_rate = turn_input * S.turn_rate * tumble_mul * delta
+	rotate_y(-yaw_rate * 0.04)  # Scale for feel
+	# Pitch: directly set target and smoothly interpolate
+	var pitch_target = pitch_input * deg_to_rad(S.pitch_rate) * tumble_mul
+	if pitch_input == 0:
+		pitch_target = 0.0  # Level out when no input
+	pitch_angle = lerp(pitch_angle, pitch_target, delta * 5.0)
+	pitch_angle = clamp(pitch_angle, deg_to_rad(-50), deg_to_rad(50))
+	# Roll: bank into turns
+	var roll_target = turn_input * deg_to_rad(35) * tumble_mul
+	roll_value = lerp(roll_value, roll_target, delta * 4.0)
 	if tumble_timer > 0:
 		tumble_timer -= 1
 
@@ -184,18 +185,17 @@ func _physics_process(delta):
 			trick_roll = 0.0
 			trick_timer = 60
 
-	# --- MOVE --- ported from moveRacer() lines 911-915
-	# Browser: x += sy*cp*sp, z += cy*cp*sp, y += sp2*sp
-	# In Godot -Z is forward, so negate Z to match visual direction
-	var cp = cos(pitch_angle)
-	var sp2 = sin(pitch_angle)
-	var cy = cos(yaw_angle)
-	var sy = sin(yaw_angle)
-	velocity = Vector3(sy * cp, sp2, -cy * cp) * current_speed
+	# --- MOVE --- using Godot's native transform
+	# Forward is -Z in local space; pitch adds vertical component
+	var forward = -transform.basis.z
+	# Add pitch effect: rotate forward vector up/down based on pitch_angle
+	var pitched_forward = Vector3(forward.x, sin(pitch_angle), forward.z).normalized()
+	velocity = pitched_forward * current_speed
 	move_and_slide()
 
-	# Apply visual rotation — negate yaw for Godot convention (-Z forward)
-	rotation = Vector3(-pitch_angle, -yaw_angle, -(roll_value + trick_roll))
+	# Apply visual pitch and roll (yaw is handled by rotate_y above)
+	rotation.x = -pitch_angle  # Nose up/down
+	rotation.z = -(roll_value + trick_roll)  # Banking
 
 	# --- FIRE WEAPON --- ported from lines 1057-1086
 	if fire_cooldown > 0:
@@ -284,7 +284,7 @@ func _respawn():
 		var prev_idx = (current_gate - 1 + Settings.num_gates) % Settings.num_gates
 		var v = race_course.get_gate_position(prev_idx)
 		global_position = (g + v) / 2.0 + Vector3.UP * 8.0
-		yaw_angle = atan2(g.x - global_position.x, g.z - global_position.z)
+		look_at(g, Vector3.UP)
 	pitch_angle = 0.0
 	roll_value = 0.0
 	current_speed = max_speed * 0.6

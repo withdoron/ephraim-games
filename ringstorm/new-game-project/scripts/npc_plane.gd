@@ -133,57 +133,56 @@ func _physics_process(delta):
 					tz = tz * 0.7 + beh.z * 0.3
 					break
 
-	# Ported from lines 939-952: steering toward target
-	var dx = tx - global_position.x
-	var dy = ty - global_position.y
-	var dz = tz - global_position.z
-	var dH = sqrt(dx * dx + dz * dz)
-	var target_yaw = atan2(dx, dz)
+	# --- STEERING --- simplified for Godot native transforms
+	var target_pos = Vector3(tx, ty, tz)
+	var to_target = target_pos - global_position
+	var flat_to_target = Vector3(to_target.x, 0, to_target.z)
+	var dH = flat_to_target.length()
+
+	# Desired yaw: angle toward target in world XZ plane
+	var desired_yaw = atan2(to_target.x, to_target.z)
+	# Current facing direction
+	var cur_forward = -transform.basis.z
+	var current_yaw = atan2(cur_forward.x, cur_forward.z)
 
 	wander_phase += 0.02
-	var yaw_diff = target_yaw + sin(wander_phase) * (1.0 - skill_level) * 5.0 * deg_to_rad(1.0) - yaw_angle
-	# Normalize angle — ported from lines 946-947
-	while yaw_diff > PI:
-		yaw_diff -= PI * 2.0
-	while yaw_diff < -PI:
-		yaw_diff += PI * 2.0
+	var wobble = sin(wander_phase) * (1.0 - skill_level) * 0.08
+
+	var yaw_diff = desired_yaw - current_yaw + wobble
+	while yaw_diff > PI: yaw_diff -= TAU
+	while yaw_diff < -PI: yaw_diff += TAU
 
 	var tumble_mul = 0.2 if tumble_timer > 0 else 1.0
-	# Ported from lines 950-952
-	target_roll = -clamp(yaw_diff * 2.5, -deg_to_rad(50), deg_to_rad(50)) * tumble_mul
-	roll_value += (target_roll - roll_value) / 18.0
-	yaw_angle += (-roll_value * 2.2 * (current_speed / max_speed)) / 60.0
+	# Turn toward target — proportional steering
+	var turn_amount = clamp(yaw_diff * 2.0, -2.5, 2.5) * tumble_mul / 60.0
+	rotate_y(turn_amount)
+	roll_value = lerp(roll_value, -turn_amount * 15.0, 0.1)
 
-	# Pitch toward target — ported from lines 960-962
-	target_pitch = clamp((dy / max(12.5, dH)) * deg_to_rad(40), -deg_to_rad(15), deg_to_rad(15)) * tumble_mul
-	pitch_angle += (target_pitch - pitch_angle) / 24.0
+	# Pitch toward target altitude
+	var pitch_target = clamp(to_target.y / max(20.0, dH) * 0.8, -0.5, 0.5) * tumble_mul
+	pitch_angle = lerp(pitch_angle, pitch_target, 0.04)
 	if tumble_timer > 0:
 		tumble_timer -= 1
 
-	# Speed — ported from lines 980-984
+	# Speed
 	var ts = max_speed * (0.8 + skill_level * 0.2)
 	if boost_timer > 0:
-		ts = max_speed * Settings.boost_multiplier
-		boost_timer -= 1
+		ts = max_speed * Settings.boost_multiplier; boost_timer -= 1
 	if star_timer > 0:
-		ts = max(ts, max_speed * Settings.star_multiplier)
-		star_timer -= 1
+		ts = max(ts, max_speed * Settings.star_multiplier); star_timer -= 1
 	if slipstream_boost > 0:
-		ts = max(ts, max_speed * Settings.star_multiplier)
-		slipstream_boost -= 1
+		ts = max(ts, max_speed * Settings.star_multiplier); slipstream_boost -= 1
 	current_speed += (ts - current_speed) / 40.0
 
-	# Move — ported from moveRacer() lines 911-915
-	# Negate Z for Godot's -Z forward convention
-	var cp = cos(pitch_angle)
-	var sp2 = sin(pitch_angle)
-	var cy = cos(yaw_angle)
-	var sy = sin(yaw_angle)
-	velocity = Vector3(sy * cp, sp2, -cy * cp) * current_speed
+	# Move forward along facing direction with pitch
+	var forward = -transform.basis.z
+	var pitched_forward = Vector3(forward.x, sin(pitch_angle), forward.z).normalized()
+	velocity = pitched_forward * current_speed
 	move_and_slide()
 
-	# Apply visual rotation — negate for Godot convention
-	rotation = Vector3(-pitch_angle, -yaw_angle, -roll_value)
+	# Visual pitch and roll
+	rotation.x = -pitch_angle
+	rotation.z = roll_value
 
 	# NPC weapon use — ported from lines 995-997
 	if weapon != "" and randf() < 0.01:
@@ -236,7 +235,7 @@ func _respawn():
 		var prev_idx = (current_gate - 1 + Settings.num_gates) % Settings.num_gates
 		var v = race_course.get_gate_position(prev_idx)
 		global_position = (g + v) / 2.0 + Vector3.UP * 8.0
-		yaw_angle = atan2(g.x - global_position.x, g.z - global_position.z)
+		look_at(g, Vector3.UP)
 	pitch_angle = 0.0
 	roll_value = 0.0
 	current_speed = max_speed * 0.6
