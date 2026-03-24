@@ -1026,19 +1026,20 @@ export default function Game() {
       }
       x.fillStyle = sg; x.fillRect(0, 0, W, vh);
       if (cr === 6) {
-        // Deep space stars — natural soft-glow dots (drawn before nebula)
+        // Deep space stars — seeded pseudo-random positions, natural soft-glow
         for (let si = 0; si < 60; si++) {
-          const sx2 = ((si * 113.7 + 31) % W), sy2 = ((si * 73.9 + 19) % vh);
-          // Twinkle: only ~half the stars twinkle, subtle range 0.6-1.0
+          const sx2 = ((Math.sin(si * 127.1 + 311.7) * 43758.5453) % 1 + 1) % 1 * W;
+          const sy2 = ((Math.sin(si * 269.5 + 183.3) * 43758.5453) % 1 + 1) % 1 * vh * 0.75;
+          const brSeed = ((Math.sin(si * 419.2 + 67.1) * 43758.5453) % 1 + 1) % 1;
           const twinkles = si % 2 === 0;
           const tw = twinkles ? Math.sin(fc * 0.015 + si * 1.7) * 0.2 : 0;
           let rad, al, blur;
-          if (si < 5) { // 5 bright stars
-            rad = 1.5; al = 0.8 + tw; blur = 6;
-          } else if (si < 20) { // 15 medium stars
-            rad = 1; al = 0.5 + (si * 13 % 10) / 30 + tw; blur = 3;
-          } else { // 40 dim stars
-            rad = 0.5; al = 0.3 + (si * 7 % 10) / 50 + tw; blur = 1;
+          if (si < 5) {
+            rad = 1.2 + brSeed * 0.5; al = 0.8 + brSeed * 0.2 + tw; blur = 5 + brSeed * 2;
+          } else if (si < 20) {
+            rad = 0.8 + brSeed * 0.4; al = 0.5 + brSeed * 0.3 + tw; blur = 2 + brSeed * 2;
+          } else {
+            rad = 0.4 + brSeed * 0.3; al = 0.3 + brSeed * 0.2 + tw; blur = 1 + brSeed;
           }
           al = Math.min(1, Math.max(0.3, al));
           x.save();
