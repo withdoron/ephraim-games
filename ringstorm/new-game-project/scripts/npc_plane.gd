@@ -54,13 +54,19 @@ var all_racers: Array = []
 # Trail
 var trail: Array = []
 
-# Mesh reference
+# Mesh reference and visual effects
 var body_mesh: MeshInstance3D
+var original_body_color: Color = Color.WHITE
+var original_wing_color: Color = Color.WHITE
+var _star_was_active: bool = false
 
 func _ready():
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	wander_phase = randf() * 6.0
 	skill_level = 0.7 + randf() * 0.3
 	_create_mesh()
+	original_body_color = racer_color
+	original_wing_color = racer_color.lightened(0.3)
 
 func _create_mesh():
 	# Staggerwing biplane — same design as player, NPC colors
@@ -152,10 +158,14 @@ func on_race_start():
 
 # Ported from Ringstorm.jsx updateNPC() lines 917-998
 func _physics_process(delta):
-	# Spin propeller even during countdown
+	# Spin propeller always
 	var prop_node = get_node_or_null("Propeller")
 	if prop_node:
 		prop_node.rotation.z += 25.0 * delta
+
+	# Freeze when paused
+	if get_tree().paused:
+		return
 
 	# Freeze during countdown
 	if not race_started:
@@ -256,6 +266,29 @@ func _physics_process(delta):
 	# Visual pitch and roll
 	rotation.x = -pitch_angle
 	rotation.z = -roll_value
+
+	# Boost fire effect
+	var bfire = get_node_or_null("BoostFire")
+	if bfire:
+		bfire.visible = boost_timer > 0
+		if boost_timer > 0:
+			var pulse = 1.0 + sin(Time.get_ticks_msec() * 0.01) * 0.3
+			bfire.scale = Vector3(pulse, pulse, 1.0 + pulse * 0.5)
+
+	# Star rainbow effect
+	if star_timer > 0:
+		_star_was_active = true
+		var hue = fmod(Time.get_ticks_msec() * 0.003, 1.0)
+		var rc = Color.from_hsv(hue, 1.0, 1.0)
+		if body_mesh and body_mesh.material_override:
+			body_mesh.material_override.albedo_color = rc
+			body_mesh.material_override.emission_enabled = true
+			body_mesh.material_override.emission = rc
+	elif _star_was_active:
+		_star_was_active = false
+		if body_mesh and body_mesh.material_override:
+			body_mesh.material_override.albedo_color = original_body_color
+			body_mesh.material_override.emission_enabled = false
 
 	# NPC weapon use — ported from lines 995-997
 	if weapon != "" and randf() < 0.01:

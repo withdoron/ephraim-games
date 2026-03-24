@@ -422,24 +422,41 @@ func _build_biplane(parent: Node3D, accent: Color, wing_color: Color):
 	canopy.position = Vector3(0, 0.35, -0.3)
 	parent.add_child(canopy)
 
+	# j. Boost fire — hidden cone behind fuselage, shown during boost
+	var fire = MeshInstance3D.new(); fire.name = "BoostFire"
+	var fcone = CylinderMesh.new(); fcone.top_radius = 0.0; fcone.bottom_radius = 0.5; fcone.height = 3.0
+	fire.mesh = fcone
+	var fmat = StandardMaterial3D.new()
+	fmat.albedo_color = Color(1.0, 0.5, 0.0, 0.8)
+	fmat.emission_enabled = true; fmat.emission = Color(1.0, 0.3, 0.0)
+	fmat.emission_energy_multiplier = 3.0
+	fmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	fire.material_override = fmat
+	fire.rotation.x = deg_to_rad(90); fire.position = Vector3(0, 0, 2.5)
+	fire.visible = false
+	parent.add_child(fire)
+
 func _setup_race(is_battle: bool):
 	if not course or course.gates.size() < 2:
 		return
-	var all = [player_plane] + npc_planes
-	var start = course.gates[0]
-	var next_gate = course.gates[1]
-	var dir = (next_gate - start).normalized()
-	var perp = dir.cross(Vector3.UP).normalized()
+	var all: Array = [player_plane]
+	if player2_plane:
+		all.append(player2_plane)
+	all.append_array(npc_planes)
+	var gate0 = course.gates[0]
+	var last_gate = course.gates[course.gates.size() - 1]
+	var race_dir = (gate0 - last_gate).normalized()
+	var lateral = race_dir.cross(Vector3.UP).normalized()
+	# Staggered grid: racers start behind gate 0 facing toward it
 	for i in range(all.size()):
 		var r = all[i]
-		var row_i = int(i / 2); var col = i % 2
-		var ox = -5.0 if col == 0 else 5.0
-		var oz = -row_i * 12.0 - 20.0
-		r.global_position = start + perp * ox + dir * oz + Vector3.UP * 3.0
-		# Face toward first gate using look_at
-		var look_target = start + Vector3.UP * 3.0
-		if r.global_position.distance_to(look_target) > 1.0:
-			r.look_at(look_target, Vector3.UP)
+		var row_i = int(i / 2)
+		var col_off = ((i % 2) - 0.5) * 10.0  # -5 or +5
+		var back_off = 40.0 + row_i * 12.0
+		r.global_position = gate0 - race_dir * back_off + lateral * col_off + Vector3.UP * 2.0
+		var look_tgt = gate0 + Vector3.UP * 2.0
+		if r.global_position.distance_to(look_tgt) > 1.0:
+			r.look_at(look_tgt, Vector3.UP)
 	player_plane.race_course = course
 	player_plane.race_manager = race_mgr
 	player_plane.hud = hud_node

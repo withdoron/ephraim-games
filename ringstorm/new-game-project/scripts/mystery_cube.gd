@@ -32,8 +32,8 @@ func generate_cubes(course: Node):
 		var px = -dz / dlen
 		var pz = dx / dlen
 
-		# 4 cubes per station at offsets -4.5, -1.5, 1.5, 4.5
-		for off in [-4.5, -1.5, 1.5, 4.5]:
+		# 4 cubes per station at wider offsets
+		for off in [-24.0, -8.0, 8.0, 24.0]:
 			var cx = mx + px * off
 			var cz = mz + pz * off
 			_spawn_cube(Vector3(cx, my, cz), "", false)

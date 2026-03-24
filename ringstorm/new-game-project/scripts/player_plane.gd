@@ -62,11 +62,24 @@ var race_manager: Node = null
 var hud: Node = null
 var all_racers: Array = []
 
+# Visual effect refs
+var original_body_color: Color = Color.WHITE
+var original_wing_color: Color = Color.WHITE
+var _star_was_active: bool = false
+
 # Nodes
 @onready var camera: Camera3D = $Camera3D
 
 func _ready():
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	max_speed = Settings.player_speed
+	# Store original colors for star rainbow restore
+	var fuse = get_node_or_null("Fuselage")
+	if fuse and fuse.material_override:
+		original_body_color = fuse.material_override.albedo_color
+	var lw = get_node_or_null("LowerWing")
+	if lw and lw.material_override:
+		original_wing_color = lw.material_override.albedo_color
 
 func on_race_start():
 	race_started = true
@@ -74,10 +87,14 @@ func on_race_start():
 	current_speed = Settings.start_speed
 
 func _physics_process(delta):
-	# Spin propeller even during countdown (looks cool)
+	# Spin propeller always
 	var prop = get_node_or_null("Propeller")
 	if prop:
 		prop.rotation.z += 25.0 * delta
+
+	# Freeze when paused
+	if get_tree().paused:
+		return
 
 	# Freeze during countdown — no movement until GO
 	if not race_started:
@@ -258,6 +275,40 @@ func _physics_process(delta):
 		trail.append(global_position)
 		if trail.size() > 30:
 			trail.pop_front()
+
+	# Boost fire effect
+	var bfire = get_node_or_null("BoostFire")
+	if bfire:
+		bfire.visible = boost_timer > 0
+		if boost_timer > 0:
+			var pulse = 1.0 + sin(Time.get_ticks_msec() * 0.01) * 0.3
+			bfire.scale = Vector3(pulse, pulse, 1.0 + pulse * 0.5)
+
+	# Star rainbow effect
+	if star_timer > 0:
+		_star_was_active = true
+		var hue = fmod(Time.get_ticks_msec() * 0.003, 1.0)
+		var rc = Color.from_hsv(hue, 1.0, 1.0)
+		var fuse = get_node_or_null("Fuselage")
+		if fuse and fuse.material_override:
+			fuse.material_override.albedo_color = rc
+			fuse.material_override.emission_enabled = true
+			fuse.material_override.emission = rc
+			fuse.material_override.emission_energy_multiplier = 1.5
+		for wname in ["LowerWing", "UpperWing"]:
+			var w = get_node_or_null(wname)
+			if w and w.material_override:
+				w.material_override.albedo_color = rc
+	elif _star_was_active:
+		_star_was_active = false
+		var fuse = get_node_or_null("Fuselage")
+		if fuse and fuse.material_override:
+			fuse.material_override.albedo_color = original_body_color
+			fuse.material_override.emission_enabled = false
+		for wname in ["LowerWing", "UpperWing"]:
+			var w = get_node_or_null(wname)
+			if w and w.material_override:
+				w.material_override.albedo_color = original_wing_color
 
 	# Camera
 	_update_camera(delta)
