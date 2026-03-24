@@ -289,13 +289,14 @@ func _create_racers(is_battle: bool):
 func _create_player_plane(data: Dictionary) -> CharacterBody3D:
 	var plane = CharacterBody3D.new()
 	plane.name = data["name"]
-	_build_biplane(plane, data["color"], data["color"].lightened(0.3))
+	_build_biplane(plane, data["color"], data.get("wing", data["color"].lightened(0.3)))
 	var cam = Camera3D.new(); cam.name = "Camera3D"; cam.current = true
 	cam.fov = 75.0; cam.far = 2000.0; cam.position = Vector3(0, 3, 8)
 	cam.rotation.x = deg_to_rad(-10); plane.add_child(cam)
 	var col = CollisionShape3D.new(); var shape = BoxShape3D.new()
 	shape.size = Vector3(2.0, 1.0, 3.5); col.shape = shape; plane.add_child(col)
 	plane.set_script(load("res://scripts/player_plane.gd"))
+	plane.racer_name = data["name"]
 	return plane
 
 func _create_npc(data: Dictionary) -> CharacterBody3D:
@@ -303,6 +304,7 @@ func _create_npc(data: Dictionary) -> CharacterBody3D:
 	npc.name = data["name"]
 	npc.set_script(load("res://scripts/npc_plane.gd"))
 	npc.racer_color = data["color"]
+	npc.wing_color = data.get("wing", data["color"].lightened(0.3))
 	npc.racer_name = data["name"]
 	npc.max_speed = Settings.npc_speed + randf() * 1.0
 	# NPC _create_mesh is called in its _ready, so we override it

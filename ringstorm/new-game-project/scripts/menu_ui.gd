@@ -131,7 +131,7 @@ func show_results(finish_order: Array):
 	_add_spacer(vbox, 15)
 	for i in range(finish_order.size()):
 		var r = finish_order[i]
-		var name_text = r.racer_name if r.has_method("get") and "racer_name" in r else r.name
+		var name_text = r.racer_name if "racer_name" in r else r.name
 		var suffix = ["st", "nd", "rd", "th", "th"][min(i, 4)]
 		var time_text = "%.1fs" % (r.finish_time / 60.0)
 		var color = Color(1.0, 0.85, 0.2) if i == 0 else Color(0.7, 0.7, 0.75) if i == 1 else Color(0.5, 0.55, 0.6)

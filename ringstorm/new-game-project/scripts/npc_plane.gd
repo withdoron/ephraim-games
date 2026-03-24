@@ -2,6 +2,7 @@ extends CharacterBody3D
 # NPC AI racer — ported from Ringstorm.jsx updateNPC() lines 917-998
 
 @export var racer_color: Color = Color.GREEN
+@export var wing_color: Color = Color(0.1, 0.1, 0.1)
 @export var racer_name: String = "NPC"
 
 # Flight state — matches browser racer object (lines 623-633)
@@ -66,12 +67,12 @@ func _ready():
 	skill_level = 0.7 + randf() * 0.3
 	_create_mesh()
 	original_body_color = racer_color
-	original_wing_color = racer_color.lightened(0.3)
+	original_wing_color = wing_color
 
 func _create_mesh():
 	# Staggerwing biplane — same design as player, NPC colors
 	var accent = racer_color
-	var wing_col = racer_color.lightened(0.3)
+	var wing_col = wing_color
 	var accent_dark = accent.darkened(0.3)
 	var bmat = StandardMaterial3D.new(); bmat.albedo_color = accent; bmat.metallic = 0.3; bmat.roughness = 0.6
 	var dmat = StandardMaterial3D.new(); dmat.albedo_color = accent_dark; dmat.metallic = 0.3

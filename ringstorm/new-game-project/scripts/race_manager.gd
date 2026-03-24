@@ -56,13 +56,20 @@ func _physics_process(delta):
 		var elapsed = (Time.get_ticks_msec() / 1000.0) - first_finish_time if first_finish_time > 0 else 0.0
 		if finish_order.size() >= 3 or elapsed > 15.0:
 			race_ended = true
-			# Force-finish remaining racers
-			for r in racers:
-				if not r.race_finished:
-					r.race_finished = true
-					r.finish_time = race_time
-					finish_order.append(r)
-					r.finish_position = finish_order.size()
+			# Force-finish remaining racers, sorted by progress
+			var unfinished: Array = racers.filter(func(r2): return not r2.race_finished)
+			unfinished.sort_custom(func(a, b):
+				var pa = a.current_lap * Settings.num_gates + a.current_gate
+				var pb = b.current_lap * Settings.num_gates + b.current_gate
+				return pa > pb  # More progress = better position
+			)
+			var penalty = race_time + 300  # 5 seconds after current time
+			for r in unfinished:
+				r.race_finished = true
+				r.finish_time = penalty
+				penalty += 180  # 3 seconds between each
+				finish_order.append(r)
+				r.finish_position = finish_order.size()
 			all_finished.emit(finish_order)
 			set_physics_process(false)
 

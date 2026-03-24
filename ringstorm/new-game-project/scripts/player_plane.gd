@@ -20,6 +20,7 @@ var finish_time: int = 0
 var finish_position: int = 0
 var is_npc: bool = false
 var autopilot_gate: int = 0
+var racer_name: String = "BLUE"
 @export var player_id: int = 1  # 1 = WASD + gamepad 0, 2 = arrows + gamepad 1
 
 # Status effects

@@ -43,11 +43,11 @@ var countdown_frames: int = 240  # 4 seconds
 
 # Racer data — ported from Ringstorm.jsx lines 597-601
 var racer_data: Array = [
-	{ "id": "p1", "name": "BLUE", "color": Color(0.2, 0.5, 1.0), "npc": false },
-	{ "id": "p2", "name": "RED", "color": Color(0.94, 0.27, 0.27), "npc": false },
-	{ "id": "n1", "name": "VIPER", "color": Color(0.13, 0.77, 0.37), "npc": true },
-	{ "id": "n2", "name": "BLAZE", "color": Color(0.96, 0.62, 0.04), "npc": true },
-	{ "id": "n3", "name": "STORM", "color": Color(0.66, 0.33, 0.97), "npc": true },
+	{ "id": "p1", "name": "BLUE", "color": Color(0.2, 0.5, 1.0), "wing": Color(0.85, 0.85, 0.9), "npc": false },
+	{ "id": "p2", "name": "RED", "color": Color(0.94, 0.27, 0.27), "wing": Color(0.85, 0.85, 0.9), "npc": false },
+	{ "id": "n1", "name": "VIPER", "color": Color(0.1, 0.7, 0.2), "wing": Color(0.1, 0.1, 0.1), "npc": true },
+	{ "id": "n2", "name": "BLAZE", "color": Color(0.9, 0.6, 0.1), "wing": Color(0.1, 0.1, 0.1), "npc": true },
+	{ "id": "n3", "name": "STORM", "color": Color(0.6, 0.2, 0.8), "wing": Color(0.1, 0.1, 0.1), "npc": true },
 ]
 
 # Course params — ported from Ringstorm.jsx lines 124-126
