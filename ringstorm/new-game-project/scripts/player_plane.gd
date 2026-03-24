@@ -19,6 +19,7 @@ var race_started: bool = false
 var finish_time: int = 0
 var finish_position: int = 0
 var is_npc: bool = false
+var autopilot_gate: int = 0
 
 # Status effects
 var boost_timer: int = 0
@@ -81,6 +82,13 @@ func _physics_process(delta):
 	if not race_started:
 		velocity = Vector3.ZERO
 		move_and_slide()
+		if camera:
+			_update_camera(delta)
+		return
+
+	# Auto-pilot after finishing — plane flies itself like Mario Kart
+	if race_finished:
+		_autopilot(delta)
 		if camera:
 			_update_camera(delta)
 		return
@@ -278,6 +286,8 @@ func _check_gate():
 			boost_timer = 60
 		if race_manager:
 			race_manager.on_racer_passed_gate(self)
+		# Set autopilot gate for post-finish flying
+		autopilot_gate = current_gate
 
 func crash():
 	# Ported from boom() lines 672-680
@@ -309,6 +319,57 @@ func _respawn():
 	trick_roll = 0.0
 	trick_frame = 0
 	trick_timer = 0
+
+func _autopilot(delta):
+	# Auto-fly the course after finishing — NPC-style navigation
+	# Propeller
+	var prop = get_node_or_null("Propeller")
+	if prop:
+		prop.rotation.z += 25.0 * delta
+
+	if not race_course or race_course.gates.size() == 0:
+		return
+
+	var target = race_course.gates[autopilot_gate % race_course.gates.size()]
+	var to_target = target - global_position
+	var distance = to_target.length()
+
+	# Steer toward target using cross product (same math as NPC)
+	var cur_fwd = -global_transform.basis.z
+	var cur_flat = Vector3(cur_fwd.x, 0, cur_fwd.z).normalized()
+	var tgt_flat = Vector3(to_target.x, 0, to_target.z)
+	if tgt_flat.length() > 1.0:
+		tgt_flat = tgt_flat.normalized()
+	else:
+		tgt_flat = cur_flat
+	var cross_y = cur_flat.x * tgt_flat.z - cur_flat.z * tgt_flat.x
+	var turn_str = clamp(cross_y * 3.0, -1.0, 1.0)
+	rotate_y(-turn_str * 2.0 * delta)
+
+	# Pitch toward target altitude
+	var alt_diff = target.y - global_position.y
+	var pitch_tgt = clamp(alt_diff / max(distance, 10.0) * 2.0, -0.3, 0.3)
+	pitch_angle = lerp(pitch_angle, pitch_tgt, delta * 2.0)
+
+	# Fly at relaxed speed (70% of max)
+	var ap_speed = Settings.player_speed * 0.7
+	var fwd = -transform.basis.z
+	velocity = Vector3(fwd.x, sin(pitch_angle), fwd.z).normalized() * ap_speed
+	move_and_slide()
+
+	# Visual roll and pitch
+	rotation.z = -turn_str * deg_to_rad(20)
+	rotation.x = -pitch_angle
+
+	# Trail
+	if Engine.get_physics_frames() % 3 == 0:
+		trail.append(global_position)
+		if trail.size() > 30:
+			trail.pop_front()
+
+	# Advance gate when close
+	if distance < race_course.gate_size + 10.0:
+		autopilot_gate = (autopilot_gate + 1) % race_course.gates.size()
 
 func _update_camera(delta):
 	if not camera:
