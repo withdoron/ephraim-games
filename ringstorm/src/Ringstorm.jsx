@@ -935,16 +935,29 @@ export default function Game() {
       const tMulP = r.tumble > 0 ? 0.2 : 1;
       if (ks[lK]) r.tr = 50 * D * tMulP; else if (ks[rK]) r.tr = -50 * D * tMulP; else r.tr = 0;
       if (ks[uK]) r.tp = 25 * D * tMulP; else if (ks[dK]) r.tp = -20 * D * tMulP; else r.tp *= 0.9;
+      // Analog stick override — proportional turning from controller
+      const gpPad = lK === "KeyA" ? ks._gp1 : lK === "ArrowLeft" ? ks._gp2 : null;
+      if (gpPad) {
+        const glx = gpPad.axes[0], gly = gpPad.axes[1], gdz = 0.2;
+        if (Math.abs(glx) > gdz) r.tr = -glx * 50 * D * tMulP;
+        if (Math.abs(gly) > gdz) r.tp = -gly * 25 * D * tMulP;
+      }
       r.rl += (r.tr - r.rl) * dt * 4;
       r.p += (r.tp - r.p) * dt * 3;
       r.yw += (-r.rl * 2.2 * (r.sp / r.ms)) * dt;
       if (r.tumble > 0) r.tumble--;
-      // Barrel roll detection — double-tap left or right
+      // Barrel roll detection — double-tap left or right (keyboard)
       if (r.trickTimer > 0) r.trickTimer--;
       if (ks[lK] && !ks["_bl" + lK]) { ks["_bl" + lK] = 1; if (fc - r.lastLF < 18 && r.trickTimer <= 0 && r.trickFrame <= 0) { r.trickFrame = 30; r.trickDir = 1; r.trickRoll = 0; } r.lastLF = fc; }
       if (!ks[lK]) ks["_bl" + lK] = 0;
       if (ks[rK] && !ks["_bl" + rK]) { ks["_bl" + rK] = 1; if (fc - r.lastRF < 18 && r.trickTimer <= 0 && r.trickFrame <= 0) { r.trickFrame = 30; r.trickDir = -1; r.trickRoll = 0; } r.lastRF = fc; }
       if (!ks[rK]) ks["_bl" + rK] = 0;
+      // Barrel roll from controller — B = right roll, X = left roll
+      if (gpPad && r.trickTimer <= 0 && r.trickFrame <= 0) {
+        if (gpPad.buttons[2]?.pressed && !ks._gpBL) { ks._gpBL = true; r.trickFrame = 30; r.trickDir = 1; r.trickRoll = 0; }
+        if (gpPad.buttons[1]?.pressed && !ks._gpBR) { ks._gpBR = true; r.trickFrame = 30; r.trickDir = -1; r.trickRoll = 0; }
+      }
+      if (gpPad) { if (!gpPad.buttons[2]?.pressed) ks._gpBL = false; if (!gpPad.buttons[1]?.pressed) ks._gpBR = false; }
       if (r.trickFrame > 0) { r.trickRoll += (Math.PI * 2 / 30) * r.trickDir; r.trickFrame--; if (r.trickFrame <= 0) { r.trickRoll = 0; r.trickTimer = 60; } }
 
       const { sy, sp2, cy } = moveRacer(r, dt);
@@ -2082,6 +2095,26 @@ export default function Game() {
     }
 
     function mainUpdate() {
+      // Gamepad polling — inject controller state into key map
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const gp1 = gamepads[0] || null, gp2 = gamepads[1] || null;
+      const gpDZ = 0.2;
+      if (gp1) {
+        const lx = gp1.axes[0], ly = gp1.axes[1];
+        if (Math.abs(lx) > gpDZ) { ky.current[lx < 0 ? "KeyA" : "KeyD"] = true; }
+        if (Math.abs(ly) > gpDZ) { ky.current[ly < 0 ? "KeyW" : "KeyS"] = true; }
+        ky.current["Space"] = ky.current["Space"] || gp1.buttons[0]?.pressed || gp1.buttons[5]?.pressed;
+        if (gp1.buttons[9]?.pressed) ky.current["KeyP"] = true;
+        ky.current._gp1 = gp1; // store raw gamepad for analog
+      }
+      if (gp2) {
+        const lx = gp2.axes[0], ly = gp2.axes[1];
+        if (Math.abs(lx) > gpDZ) { ky.current[lx < 0 ? "ArrowLeft" : "ArrowRight"] = true; }
+        if (Math.abs(ly) > gpDZ) { ky.current[ly < 0 ? "ArrowUp" : "ArrowDown"] = true; }
+        ky.current["ShiftRight"] = ky.current["ShiftRight"] || gp2.buttons[0]?.pressed || gp2.buttons[5]?.pressed;
+        if (gp2.buttons[9]?.pressed) ky.current["KeyP"] = true;
+        ky.current._gp2 = gp2;
+      }
       if (ky.current["KeyP"] && !ky.current._pauseCD) {
         ky.current._pauseCD = true;
         setTimeout(() => { ky.current._pauseCD = false; }, 300);
@@ -2449,6 +2482,11 @@ export default function Game() {
             <div><b style={{ color: "#06b6d4" }}>Double-tap ←/→</b> Barrel Roll</div>
           </div>
         </div>
+      </div>
+      <div style={{ background: "rgba(0,0,0,0.25)", borderRadius: "12px", padding: "12px 20px", border: "2px solid #8b5cf644", marginBottom: "12px", width: "min(460px,90vw)", textAlign: "left" }}>
+        <div style={{ color: "#8b5cf6", fontWeight: 900, fontSize: "13px", marginBottom: "6px" }}>🎮 CONTROLLER</div>
+        <div style={{ fontSize: "11px", color: "#94a3b8", lineHeight: "1.8" }}>Left Stick = Fly · A / RB = Weapon · B = Roll Right · X = Roll Left · Start = Pause</div>
+        <div style={{ fontSize: "10px", color: "#64748b", marginTop: "4px" }}>Xbox controllers supported — plug in via USB or Bluetooth. P1 = first controller, P2 = second.</div>
       </div>
       <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "20px" }}>🟨 Gold cubes = powerups · 🔫 Gun · 🚀 Boost · 💥 Homing Missile · ⭐ Star · 🛡️ Flares · ⚡ Lightning Storm · 🌪️ Tornado — pulls racers in and throws them backward</div>
       <button onClick={() => setSc("menu")} style={{ padding: "12px 28px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "10px", color: "#e2e8f0", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>Back to Menu</button>
