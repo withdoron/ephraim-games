@@ -22,6 +22,7 @@ var skill_level: float = 0.85  # r.ns — 0.7 to 1.0
 var current_gate: int = 0
 var current_lap: int = 0
 var race_finished: bool = false
+var race_started: bool = false
 var finish_time: int = 0
 var finish_position: int = 0
 var is_npc: bool = true
@@ -145,12 +146,24 @@ func _create_mesh():
 	add_child(col)
 
 func on_race_start():
+	race_started = true
 	throttle = 1.0
 	current_speed = Settings.start_speed
 
 # Ported from Ringstorm.jsx updateNPC() lines 917-998
 func _physics_process(delta):
-	max_speed = Settings.npc_speed + (skill_level - 0.7) * 3.0  # Live update from settings
+	# Spin propeller even during countdown
+	var prop_node = get_node_or_null("Propeller")
+	if prop_node:
+		prop_node.rotation.z += 25.0 * delta
+
+	# Freeze during countdown
+	if not race_started:
+		velocity = Vector3.ZERO
+		move_and_slide()
+		return
+
+	max_speed = Settings.npc_speed + (skill_level - 0.7) * 3.0
 	if race_finished:
 		return
 	if is_crashed:
@@ -243,11 +256,6 @@ func _physics_process(delta):
 	# Visual pitch and roll
 	rotation.x = -pitch_angle
 	rotation.z = -roll_value
-
-	# Spin propeller
-	var prop = get_node_or_null("Propeller")
-	if prop:
-		prop.rotation.z += 25.0 * delta
 
 	# NPC weapon use — ported from lines 995-997
 	if weapon != "" and randf() < 0.01:

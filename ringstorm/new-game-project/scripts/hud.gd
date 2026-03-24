@@ -91,10 +91,23 @@ func _process(delta):
 func update_hud(lap: int, total_laps: int, gate: int, total_gates: int, finished: bool = false):
 	lap_label.text = "Lap " + str(min(lap + 1, total_laps)) + "/" + str(total_laps)
 	gate_label.text = "Gate " + str(gate + 1) + "/" + str(total_gates)
-	if finished:
-		finish_label.visible = true
-		lap_label.text = "FINISHED"
-		gate_label.text = ""
+
+func show_player_finished(position: int):
+	# Only called when the PLAYER finishes, not NPCs
+	var pos_text = str(position)
+	var suffix = "TH"
+	if position == 1: suffix = "ST"
+	elif position == 2: suffix = "ND"
+	elif position == 3: suffix = "RD"
+	finish_label.text = pos_text + suffix + " PLACE!"
+	finish_label.add_theme_color_override("font_color",
+		Color(0.98, 0.75, 0.14) if position == 1 else
+		Color(0.75, 0.75, 0.8) if position == 2 else
+		Color(0.8, 0.5, 0.2) if position == 3 else
+		Color(0.6, 0.6, 0.65))
+	finish_label.visible = true
+	lap_label.text = "FINISHED"
+	gate_label.text = ""
 
 func update_position(pos: int):
 	var suffix = "th"

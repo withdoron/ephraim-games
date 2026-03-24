@@ -15,6 +15,7 @@ var throttle: float = 0.0     # r.th
 var current_gate: int = 0
 var current_lap: int = 0
 var race_finished: bool = false
+var race_started: bool = false
 var finish_time: int = 0
 var finish_position: int = 0
 var is_npc: bool = false
@@ -66,14 +67,24 @@ func _ready():
 	max_speed = Settings.player_speed
 
 func on_race_start():
+	race_started = true
 	throttle = 1.0
 	current_speed = Settings.start_speed
 
 func _physics_process(delta):
-	if race_finished:
+	# Spin propeller even during countdown (looks cool)
+	var prop = get_node_or_null("Propeller")
+	if prop:
+		prop.rotation.z += 25.0 * delta
+
+	# Freeze during countdown — no movement until GO
+	if not race_started:
+		velocity = Vector3.ZERO
+		move_and_slide()
 		if camera:
 			_update_camera(delta)
 		return
+
 	if is_crashed:
 		crash_timer -= 1
 		if crash_timer <= 0:
@@ -235,11 +246,6 @@ func _physics_process(delta):
 		trail.append(global_position)
 		if trail.size() > 30:
 			trail.pop_front()
-
-	# Spin propeller
-	var prop = get_node_or_null("Propeller")
-	if prop:
-		prop.rotation.z += 25.0 * delta
 
 	# Camera
 	_update_camera(delta)

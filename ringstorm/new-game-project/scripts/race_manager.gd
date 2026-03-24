@@ -17,6 +17,8 @@ var finish_order: Array = []
 var is_battle: bool = false
 var racers: Array = []  # All racer nodes
 var course: Node = null  # RaceCourse node
+var first_finish_time: float = -1.0
+var race_ended: bool = false
 
 func start_countdown():
 	countdown = Settings.countdown_frames
@@ -24,6 +26,8 @@ func start_countdown():
 	race_time = 0
 	frame_count = 0
 	finish_order.clear()
+	first_finish_time = -1.0
+	race_ended = false
 
 func _physics_process(delta):
 	if countdown > 0:
@@ -43,9 +47,22 @@ func _physics_process(delta):
 	race_time += 1
 	frame_count += 1
 
-	# Check if all racers finished (race mode) or one survivor (battle mode)
-	if not is_battle:
-		if racers.size() > 0 and racers.all(func(r): return r.race_finished):
+	# Track first finish time
+	if finish_order.size() > 0 and first_finish_time < 0:
+		first_finish_time = Time.get_ticks_msec() / 1000.0
+
+	# Race ends when 3+ finish OR 15 seconds after first finish
+	if not is_battle and not race_ended and finish_order.size() > 0:
+		var elapsed = (Time.get_ticks_msec() / 1000.0) - first_finish_time if first_finish_time > 0 else 0.0
+		if finish_order.size() >= 3 or elapsed > 15.0:
+			race_ended = true
+			# Force-finish remaining racers
+			for r in racers:
+				if not r.race_finished:
+					r.race_finished = true
+					r.finish_time = race_time
+					finish_order.append(r)
+					r.finish_position = finish_order.size()
 			all_finished.emit(finish_order)
 			set_physics_process(false)
 

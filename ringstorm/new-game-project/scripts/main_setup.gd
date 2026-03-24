@@ -421,10 +421,16 @@ func _on_lap_completed(racer: Node, lap: int):
 		AudioManager.play("lap_complete")
 
 func _on_race_finished(racer: Node, position: int):
-	if not racer.is_npc and position == 1:
-		hud_node.show_announcement("1ST PLACE!", Color(0.98, 0.75, 0.14))
-		AudioManager.play("victory")
-	hud_node.update_hud(racer.current_lap, Settings.total_laps, racer.current_gate, Settings.num_gates, racer.race_finished)
+	if not racer.is_npc:
+		# Player finished — show their position
+		hud_node.show_player_finished(position)
+		var pos_names = ["", "1ST PLACE!", "2ND PLACE!", "3RD PLACE!", "4TH PLACE!", "5TH PLACE!"]
+		var pos_text = pos_names[position] if position < pos_names.size() else str(position) + "TH PLACE!"
+		hud_node.show_announcement(pos_text, Color(0.98, 0.75, 0.14) if position == 1 else Color(0.75, 0.75, 0.8))
+		if position == 1:
+			AudioManager.play("victory")
+		else:
+			AudioManager.play("lap_complete")
 
 func _on_all_finished(finish_order: Array):
 	AudioManager.stop_engine()
