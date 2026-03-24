@@ -214,25 +214,12 @@ func _create_racers(is_battle: bool):
 func _create_player_plane(data: Dictionary) -> CharacterBody3D:
 	var plane = CharacterBody3D.new()
 	plane.name = data["name"]
-	var body = MeshInstance3D.new(); body.name = "MeshInstance3D"
-	var box = BoxMesh.new(); box.size = Vector3(1.5, 0.4, 3.0); body.mesh = box
-	var bmat = StandardMaterial3D.new(); bmat.albedo_color = data["color"]; bmat.metallic = 0.3
-	body.material_override = bmat; plane.add_child(body)
-	var wings = MeshInstance3D.new(); wings.name = "Wings"
-	var wmesh = BoxMesh.new(); wmesh.size = Vector3(6.0, 0.1, 1.5); wings.mesh = wmesh
-	var wmat = StandardMaterial3D.new(); wmat.albedo_color = data["color"].lightened(0.3); wmat.metallic = 0.2
-	wings.material_override = wmat; wings.position = Vector3(0, 0, 0.3); plane.add_child(wings)
-	var tail = MeshInstance3D.new(); tail.name = "Tail"
-	var tmesh = BoxMesh.new(); tmesh.size = Vector3(2.0, 0.08, 0.8); tail.mesh = tmesh
-	tail.material_override = wmat; tail.position = Vector3(0, 0.3, 1.3); plane.add_child(tail)
-	var vstab = MeshInstance3D.new(); vstab.name = "VStab"
-	var vmesh = BoxMesh.new(); vmesh.size = Vector3(0.08, 0.8, 0.6); vstab.mesh = vmesh
-	vstab.material_override = bmat; vstab.position = Vector3(0, 0.5, 1.2); plane.add_child(vstab)
+	_build_biplane(plane, data["color"], data["color"].lightened(0.3))
 	var cam = Camera3D.new(); cam.name = "Camera3D"; cam.current = true
 	cam.fov = 75.0; cam.far = 2000.0; cam.position = Vector3(0, 3, 8)
 	cam.rotation.x = deg_to_rad(-10); plane.add_child(cam)
 	var col = CollisionShape3D.new(); var shape = BoxShape3D.new()
-	shape.size = Vector3(1.5, 0.5, 3.0); col.shape = shape; plane.add_child(col)
+	shape.size = Vector3(2.0, 1.0, 3.5); col.shape = shape; plane.add_child(col)
 	plane.set_script(load("res://scripts/player_plane.gd"))
 	return plane
 
@@ -243,7 +230,122 @@ func _create_npc(data: Dictionary) -> CharacterBody3D:
 	npc.racer_color = data["color"]
 	npc.racer_name = data["name"]
 	npc.max_speed = Settings.npc_speed + randf() * 1.0
+	# NPC _create_mesh is called in its _ready, so we override it
 	return npc
+
+# --- Staggerwing biplane builder ---
+func _build_biplane(parent: Node3D, accent: Color, wing_color: Color):
+	var accent_dark = accent.darkened(0.3)
+	# Materials
+	var body_mat = StandardMaterial3D.new()
+	body_mat.albedo_color = accent; body_mat.metallic = 0.3; body_mat.roughness = 0.6
+	var dark_mat = StandardMaterial3D.new()
+	dark_mat.albedo_color = accent_dark; dark_mat.metallic = 0.3; dark_mat.roughness = 0.6
+	var wing_mat = StandardMaterial3D.new()
+	wing_mat.albedo_color = wing_color; wing_mat.metallic = 0.1; wing_mat.roughness = 0.8
+	var strut_mat = StandardMaterial3D.new()
+	strut_mat.albedo_color = Color(0.25, 0.25, 0.25); strut_mat.metallic = 0.2
+	var prop_mat = StandardMaterial3D.new()
+	prop_mat.albedo_color = Color(0.3, 0.2, 0.1); prop_mat.roughness = 1.0
+
+	# a. Fuselage — cylinder along Z axis
+	var fuse = MeshInstance3D.new(); fuse.name = "Fuselage"
+	var fcyl = CylinderMesh.new(); fcyl.top_radius = 0.35; fcyl.bottom_radius = 0.35; fcyl.height = 3.5
+	fuse.mesh = fcyl; fuse.material_override = body_mat
+	fuse.rotation.x = deg_to_rad(90)  # Lay along Z
+	parent.add_child(fuse)
+
+	# Tail taper
+	var ttaper = MeshInstance3D.new(); ttaper.name = "TailTaper"
+	var tcyl = CylinderMesh.new(); tcyl.top_radius = 0.35; tcyl.bottom_radius = 0.18; tcyl.height = 1.0
+	ttaper.mesh = tcyl; ttaper.material_override = body_mat
+	ttaper.rotation.x = deg_to_rad(90); ttaper.position = Vector3(0, 0, 1.2)
+	parent.add_child(ttaper)
+
+	# b. Engine cowl
+	var cowl = MeshInstance3D.new(); cowl.name = "Cowl"
+	var ccyl = CylinderMesh.new(); ccyl.top_radius = 0.45; ccyl.bottom_radius = 0.45; ccyl.height = 0.6
+	cowl.mesh = ccyl; cowl.material_override = dark_mat
+	cowl.rotation.x = deg_to_rad(90); cowl.position = Vector3(0, 0, -1.5)
+	parent.add_child(cowl)
+
+	# Spinner
+	var spin = MeshInstance3D.new(); spin.name = "Spinner"
+	var ssph = SphereMesh.new(); ssph.radius = 0.15; ssph.height = 0.3
+	spin.mesh = ssph
+	var spin_mat = StandardMaterial3D.new()
+	spin_mat.albedo_color = Color(0.7, 0.7, 0.75); spin_mat.metallic = 0.6
+	spin.material_override = spin_mat; spin.position = Vector3(0, 0, -1.85)
+	parent.add_child(spin)
+
+	# c. Propeller
+	var prop = MeshInstance3D.new(); prop.name = "Propeller"
+	var pbox = BoxMesh.new(); pbox.size = Vector3(2.0, 0.08, 0.15)
+	prop.mesh = pbox; prop.material_override = prop_mat
+	prop.position = Vector3(0, 0, -1.9)
+	parent.add_child(prop)
+
+	# d. Lower wing (slightly behind center — staggerwing)
+	var lwing = MeshInstance3D.new(); lwing.name = "LowerWing"
+	var lwbox = BoxMesh.new(); lwbox.size = Vector3(7.0, 0.08, 1.2)
+	lwing.mesh = lwbox; lwing.material_override = wing_mat
+	lwing.position = Vector3(0, -0.2, 0.3)
+	parent.add_child(lwing)
+
+	# e. Upper wing (slightly forward — the stagger)
+	var uwing = MeshInstance3D.new(); uwing.name = "UpperWing"
+	var uwbox = BoxMesh.new(); uwbox.size = Vector3(6.5, 0.08, 1.1)
+	uwing.mesh = uwbox; uwing.material_override = wing_mat
+	uwing.position = Vector3(0, 0.8, -0.2)
+	parent.add_child(uwing)
+
+	# f. Wing struts — 4 thin cylinders
+	for sx in [-1.2, -2.8, 1.2, 2.8]:
+		var strut = MeshInstance3D.new(); strut.name = "Strut"
+		var scyl = CylinderMesh.new(); scyl.top_radius = 0.04; scyl.bottom_radius = 0.04; scyl.height = 1.1
+		strut.mesh = scyl; strut.material_override = strut_mat
+		strut.position = Vector3(sx, 0.3, 0.05)
+		parent.add_child(strut)
+
+	# g. Horizontal stabilizer
+	var hstab = MeshInstance3D.new(); hstab.name = "HStab"
+	var hbox = BoxMesh.new(); hbox.size = Vector3(2.5, 0.06, 0.7)
+	hstab.mesh = hbox; hstab.material_override = wing_mat
+	hstab.position = Vector3(0, 0.1, 1.6)
+	parent.add_child(hstab)
+
+	# Vertical stabilizer (rudder)
+	var vstab = MeshInstance3D.new(); vstab.name = "VStab"
+	var vbox = BoxMesh.new(); vbox.size = Vector3(0.06, 0.8, 0.6)
+	vstab.mesh = vbox; vstab.material_override = body_mat
+	vstab.position = Vector3(0, 0.5, 1.6)
+	parent.add_child(vstab)
+
+	# h. Landing gear
+	for side in [-1, 1]:
+		var gear = MeshInstance3D.new(); gear.name = "Gear"
+		var gcyl = CylinderMesh.new(); gcyl.top_radius = 0.04; gcyl.bottom_radius = 0.04; gcyl.height = 0.6
+		gear.mesh = gcyl; gear.material_override = strut_mat
+		gear.position = Vector3(side * 0.8, -0.5, -0.3)
+		gear.rotation.x = deg_to_rad(15)
+		parent.add_child(gear)
+		var wheel = MeshInstance3D.new(); wheel.name = "Wheel"
+		var wsph = SphereMesh.new(); wsph.radius = 0.12; wsph.height = 0.24
+		wheel.mesh = wsph; wheel.material_override = strut_mat
+		wheel.position = Vector3(side * 0.8, -0.8, -0.25)
+		parent.add_child(wheel)
+
+	# i. Cockpit canopy
+	var canopy = MeshInstance3D.new(); canopy.name = "Cockpit"
+	var cbox = BoxMesh.new(); cbox.size = Vector3(0.5, 0.3, 0.6)
+	canopy.mesh = cbox
+	var canopy_mat = StandardMaterial3D.new()
+	canopy_mat.albedo_color = Color(0.5, 0.7, 1.0, 0.4)
+	canopy_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	canopy_mat.metallic = 0.5; canopy_mat.roughness = 0.3
+	canopy.material_override = canopy_mat
+	canopy.position = Vector3(0, 0.35, -0.3)
+	parent.add_child(canopy)
 
 func _setup_race(is_battle: bool):
 	if not course or course.gates.size() < 2:
