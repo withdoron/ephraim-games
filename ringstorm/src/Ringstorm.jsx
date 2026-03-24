@@ -625,7 +625,7 @@ export default function Game() {
       }
       return {
         ...d, x: sx, y: sy2, z: sz,
-        p: 0, yw: syw, rl: 0, sp: 0, ms: d.npc ? 3.7 + Math.random() * 0.7 : 4,
+        p: 0, yw: syw, rl: 0, sp: 0, ms: d.npc ? 5.2 + Math.random() * 1 : 6,
         th: 0, tp: 0, tr: 0, wp: null, wt: 0, st: 0, bt: 0,
         cr: 0, ct: 0, cx: 0, cy: 0, cz: 0, ep: [],
         ng: 0, lp: 0, fn: 0, ft: 0, fp: 0, hf: 0,
@@ -679,7 +679,7 @@ export default function Game() {
       for (let i = 0; i < 4; i++) p.ep.push({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 2, vy: Math.random() * 1.5, vz: (Math.random() - 0.5) * 2, s: 7 + Math.random() * 10, l: 30 + Math.random() * 20, ml: 50, t: 1 });
       for (let i = 0; i < 6; i++) p.ep.push({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 14, vy: Math.random() * 8 + 3, vz: (Math.random() - 0.5) * 14, s: 2 + Math.random() * 2, l: 10 + Math.random() * 10, ml: 20, t: 2 });
       if (iB) p.lv--;
-      if (!p.npc) addAnnouncement("CRASH!", "#ef4444");
+      // "CRASHED!" already shown on screen during crash state
     }
 
     function boomFrom(p, attacker) { boom(p); if (iB && attacker && attacker !== p) attacker.kl++; }
@@ -1054,11 +1054,12 @@ export default function Game() {
       const { sy, sp2, cy } = moveRacer(r, dt);
       checkSlipstream(r);
 
-      // Fire weapon — rising edge only (fire on press, not hold)
-      const fireNow = ks[fK];
-      const firePrev = ks["_fp_" + fK] || false;
-      ks["_fp_" + fK] = fireNow;
-      if (fireNow && !firePrev && r.wp) {
+      // Fire weapon — cooldown-based (15 frame minimum between fires)
+      if (!r._fireCD) r._fireCD = 0;
+      if (r._fireCD > 0) r._fireCD--;
+      const wantFire = ks[fK];
+      if (wantFire && r._fireCD <= 0 && r.wp) {
+        r._fireCD = 15;
         if (r.wp === "gun") {
           for (let i = -1; i <= 1; i += 2) pj.push({ x: r.x + i * 3, y: r.y, z: r.z, vx: sy * 20, vy: sp2 * 20, vz: cy * 20, l: 60, s: 2, cl: "#fbbf24", o: r, hm: 0 });
           r.wt--; if (r.wt <= 0) r.wp = null;
@@ -2223,7 +2224,7 @@ export default function Game() {
       }
       if (pauseRef.current) return;
       if (cd > 0) { cd--; fc++; return; }
-      if (!started) { started = 1; rs.forEach(r => { r.th = 1; r.sp = iB ? 0 : 0.5; }); }
+      if (!started) { started = 1; rs.forEach(r => { r.th = 1; r.sp = iB ? 0 : 1; }); }
       rt++;
 
       // Replay recording — capture positions after first racer finishes
