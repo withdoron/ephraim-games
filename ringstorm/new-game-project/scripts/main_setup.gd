@@ -453,10 +453,12 @@ func _setup_race(is_battle: bool):
 	for i in range(all.size()):
 		var r = all[i]
 		var row_i = int(i / 2)
-		var col_off = ((i % 2) - 0.5) * 10.0  # -5 or +5
-		var back_off = 40.0 + row_i * 12.0
-		r.global_position = gate0 - race_dir * back_off + lateral * col_off + Vector3.UP * 2.0
-		var look_tgt = gate0 + Vector3.UP * 2.0
+		var col_off = ((i % 2) - 0.5) * 6.0  # -3 or +3
+		var back_off = 20.0 + row_i * 5.0
+		r.global_position = gate0 - race_dir * back_off + lateral * col_off
+		r.global_position.y = gate0.y  # Match gate altitude exactly
+		var look_tgt = gate0
+		look_tgt.y = gate0.y
 		if r.global_position.distance_to(look_tgt) > 1.0:
 			r.look_at(look_tgt, Vector3.UP)
 	player_plane.race_course = course
