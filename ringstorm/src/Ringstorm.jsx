@@ -373,8 +373,8 @@ export default function Game() {
         asteroids.push({ x: ax, y: ay, z: az, radius: rad, rot: Math.random() * Math.PI * 2, rotSpeed: 0.005 + Math.random() * 0.015, color: astColors[Math.floor(Math.random() * astColors.length)], verts, nv });
       }
       // Planets — solid objects with collision
-      planets.push({ x: 800, y: 300, z: 600, radius: 200, type: "gas" });
-      planets.push({ x: -600, y: 200, z: -800, radius: 80, type: "rocky" });
+      planets.push({ x: 2200, y: 400, z: 1800, radius: 200, type: "gas" });
+      planets.push({ x: -1800, y: 250, z: -2000, radius: 80, type: "rocky" });
       // Space station near midpoint of gates 2-3
       const sg1 = crs[2], sg2 = crs[3];
       const sdx = sg2.x - sg1.x, sdz = sg2.z - sg1.z;
@@ -686,10 +686,7 @@ export default function Game() {
         const d = Math.sqrt((r.x - ast.x) ** 2 + (r.y - ast.y) ** 2 + (r.z - ast.z) ** 2);
         if (d < ast.radius + 8) { boom(r); return 1; }
       }
-      for (const pl of planets) {
-        const d = Math.sqrt((r.x - pl.x) ** 2 + (r.y - pl.y) ** 2 + (r.z - pl.z) ** 2);
-        if (d < pl.radius + 10) { boom(r); return 1; }
-      }
+      // Planets are distant scenery — no collision needed
       if (r.y > 600) r.y = 600;
       return 0;
     }
@@ -1029,39 +1026,38 @@ export default function Game() {
       }
       x.fillStyle = sg; x.fillRect(0, 0, W, vh);
       if (cr === 6) {
-        // Deep space stars — 60 sparkle shapes
-        const brightStars = [3,11,17,24,31,38,47,55]; // 8 brightest
+        // Deep space stars — natural soft-glow dots (drawn before nebula)
         for (let si = 0; si < 60; si++) {
           const sx2 = ((si * 113.7 + 31) % W), sy2 = ((si * 73.9 + 19) % vh);
-          const tw = Math.sin(fc * 0.02 + si * 1.7);
-          const br = 0.3 + (si * 17 % 10) / 10 * 0.5 + tw * 0.2;
-          const al = Math.min(1, Math.max(0.3, br));
-          const isBright = brightStars.includes(si);
-          const len = isBright ? 3 + (si % 3) : 1 + (si % 3);
-          x.strokeStyle = `rgba(255,255,255,${al})`; x.lineWidth = 1;
-          x.beginPath(); x.moveTo(sx2 - len, sy2); x.lineTo(sx2 + len, sy2); x.stroke();
-          x.beginPath(); x.moveTo(sx2, sy2 - len); x.lineTo(sx2, sy2 + len); x.stroke();
-          if (isBright) {
-            const dl = len * 0.7;
-            x.beginPath(); x.moveTo(sx2 - dl, sy2 - dl); x.lineTo(sx2 + dl, sy2 + dl); x.stroke();
-            x.beginPath(); x.moveTo(sx2 + dl, sy2 - dl); x.lineTo(sx2 - dl, sy2 + dl); x.stroke();
-            x.save(); x.shadowColor = "rgba(255,255,255,0.6)"; x.shadowBlur = 3;
-            x.fillStyle = `rgba(255,255,255,${al})`; x.beginPath(); x.arc(sx2, sy2, 1, 0, Math.PI * 2); x.fill();
-            x.restore();
+          // Twinkle: only ~half the stars twinkle, subtle range 0.6-1.0
+          const twinkles = si % 2 === 0;
+          const tw = twinkles ? Math.sin(fc * 0.015 + si * 1.7) * 0.2 : 0;
+          let rad, al, blur;
+          if (si < 5) { // 5 bright stars
+            rad = 1.5; al = 0.8 + tw; blur = 6;
+          } else if (si < 20) { // 15 medium stars
+            rad = 1; al = 0.5 + (si * 13 % 10) / 30 + tw; blur = 3;
+          } else { // 40 dim stars
+            rad = 0.5; al = 0.3 + (si * 7 % 10) / 50 + tw; blur = 1;
           }
+          al = Math.min(1, Math.max(0.3, al));
+          x.save();
+          x.shadowColor = "rgba(255,250,240,0.7)"; x.shadowBlur = blur;
+          x.fillStyle = `rgba(255,255,255,${al})`;
+          x.beginPath(); x.arc(sx2, sy2, rad, 0, Math.PI * 2); x.fill();
+          x.restore();
         }
-        // 3 colored stars
-        const colorStars = [[W*0.15, vh*0.12, "rgba(255,180,150,"], [W*0.65, vh*0.08, "rgba(150,180,255,"], [W*0.85, vh*0.35, "rgba(255,255,180,"]];
-        colorStars.forEach(([cx, cy, col]) => {
-          const cal = 0.6 + Math.sin(fc * 0.015 + cx) * 0.3;
-          x.save(); x.shadowColor = col + "0.5)"; x.shadowBlur = 4;
-          x.strokeStyle = col + `${cal})`; x.lineWidth = 1.5;
-          x.beginPath(); x.moveTo(cx - 4, cy); x.lineTo(cx + 4, cy); x.stroke();
-          x.beginPath(); x.moveTo(cx, cy - 4); x.lineTo(cx, cy + 4); x.stroke();
-          x.fillStyle = col + `${cal})`; x.beginPath(); x.arc(cx, cy, 1.5, 0, Math.PI * 2); x.fill();
+        // 3 subtly colored stars — same size as bright stars, tinted glow
+        const colorStars = [[W*0.15, vh*0.12, [255,210,190]], [W*0.65, vh*0.08, [190,210,255]], [W*0.85, vh*0.35, [255,255,210]]];
+        colorStars.forEach(([cx, cy, c]) => {
+          const cal = 0.7 + Math.sin(fc * 0.012 + cx) * 0.15;
+          x.save();
+          x.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},0.5)`; x.shadowBlur = 6;
+          x.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${cal})`;
+          x.beginPath(); x.arc(cx, cy, 1.5, 0, Math.PI * 2); x.fill();
           x.restore();
         });
-        // Nebula — subtle purple-blue haze
+        // Nebula — subtle purple-blue haze (drawn over stars to slightly dim them)
         const nebG = x.createRadialGradient(W * 0.3, vh * 0.25, 0, W * 0.3, vh * 0.25, vh * 0.4);
         nebG.addColorStop(0, "rgba(80,30,120,0.08)"); nebG.addColorStop(0.5, "rgba(30,60,120,0.04)"); nebG.addColorStop(1, "rgba(0,0,0,0)");
         x.fillStyle = nebG; x.fillRect(0, 0, W, vh);
