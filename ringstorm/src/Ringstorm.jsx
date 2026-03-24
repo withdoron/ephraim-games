@@ -594,7 +594,7 @@ export default function Game() {
           r.slDraft++;
           r.slTarget = o;
           found = true;
-          if (r.slDraft >= 120) { r.slBoost = 90; r.slDraft = 0; r.slTarget = null; }
+          if (r.slDraft >= 120) { r.slBoost = 90; r.slDraft = 0; r.slTarget = null; if (!r.npc) addAnnouncement("NICE DRAFT!", "#3b82f6"); }
           break;
         }
       }
@@ -764,6 +764,7 @@ export default function Game() {
         const dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
         if (dist < bg.sz + 18) {
           r.scUsed.add(bg.type);
+          if (!r.npc) addAnnouncement("SHORTCUT!", "#3b82f6");
           r.ng += bg.gateskip;
           if (r.ng >= NG) { r.ng = 0; r.lp++; r.scUsed = new Set(); if (r.lp >= LAPS) { r.fn = 1; r.ft = rt; fo.push(r); r.fp = fo.length; } }
         }
@@ -884,6 +885,13 @@ export default function Game() {
       r.p += (r.tp - r.p) * dt * 3;
       r.yw += (-r.rl * 2.2 * (r.sp / r.ms)) * dt;
       if (r.tumble > 0) r.tumble--;
+      // Barrel roll detection — double-tap left or right
+      if (r.trickTimer > 0) r.trickTimer--;
+      if (ks[lK] && !ks["_bl" + lK]) { ks["_bl" + lK] = 1; if (fc - r.lastLF < 18 && r.trickTimer <= 0 && r.trickFrame <= 0) { r.trickFrame = 30; r.trickDir = 1; r.trickRoll = 0; } r.lastLF = fc; }
+      if (!ks[lK]) ks["_bl" + lK] = 0;
+      if (ks[rK] && !ks["_bl" + rK]) { ks["_bl" + rK] = 1; if (fc - r.lastRF < 18 && r.trickTimer <= 0 && r.trickFrame <= 0) { r.trickFrame = 30; r.trickDir = -1; r.trickRoll = 0; } r.lastRF = fc; }
+      if (!ks[rK]) ks["_bl" + rK] = 0;
+      if (r.trickFrame > 0) { r.trickRoll += (Math.PI * 2 / 30) * r.trickDir; r.trickFrame--; if (r.trickFrame <= 0) { r.trickRoll = 0; r.trickTimer = 60; } }
 
       const { sy, sp2, cy } = moveRacer(r, dt);
       checkSlipstream(r);
@@ -899,9 +907,9 @@ export default function Game() {
           const tgs = rs.filter(t => t !== r && !t.cr && !t.fn);
           const tg = tgs.length ? tgs.reduce((b, t) => { const d = Math.sqrt((t.x - r.x) ** 2 + (t.z - r.z) ** 2); return d < b.d ? { t, d } : b; }, { t: null, d: Infinity }).t : null;
           pj.push({ x: r.x, y: r.y, z: r.z, vx: sy * 12, vy: sp2 * 12, vz: cy * 12, l: 180, s: 4, cl: "#ef4444", o: r, hm: 1, tg: tg });
-          r.wp = null;
+          r.wp = null; addAnnouncement("MISSILE AWAY!", "#ef4444");
         } else if (r.wp === "boost") { r.bt = 120; r.wp = null; }
-        else if (r.wp === "star") { r.st = 180; r.wp = null; }
+        else if (r.wp === "star") { r.st = 180; r.wp = null; addAnnouncement("STAR POWER!", "#fbbf24"); }
         else if (r.wp === "flares") {
           for (let i = 0; i < 6; i++) pj.push({ x: r.x, y: r.y, z: r.z, vx: (Math.random() - 0.5) * 12, vy: -Math.random() * 5 - 2, vz: (Math.random() - 0.5) * 12, l: 50, s: 3, cl: "#fff", o: r, hm: 0, fl: 1 });
           r.hf = 1; setTimeout(() => { r.hf = 0; }, 2000);
@@ -949,18 +957,36 @@ export default function Game() {
     function renderView(cam, vw, yO, vh) {
       x.save();
       x.beginPath(); x.rect(0, yO, W, vh); x.clip(); x.translate(0, yO);
-      // Sky — 8-stop gradient
+      // Sky gradient
       const sg = x.createLinearGradient(0, 0, 0, vh);
-      sg.addColorStop(0, "#050d1a"); sg.addColorStop(0.12, "#0a1628"); sg.addColorStop(0.25, "#132d4a");
-      sg.addColorStop(0.4, "#1a4a6e"); sg.addColorStop(0.55, "#3a7a9e"); sg.addColorStop(0.7, "#5a9ebe");
-      sg.addColorStop(0.85, "#87CEEB"); sg.addColorStop(1, "#d4a060");
+      if (isNight) {
+        sg.addColorStop(0, "#020408"); sg.addColorStop(0.3, "#0a0e1a"); sg.addColorStop(0.6, "#0f1525");
+        sg.addColorStop(0.8, "#1a2035"); sg.addColorStop(1, "#1a2540");
+      } else {
+        sg.addColorStop(0, "#050d1a"); sg.addColorStop(0.12, "#0a1628"); sg.addColorStop(0.25, "#132d4a");
+        sg.addColorStop(0.4, "#1a4a6e"); sg.addColorStop(0.55, "#3a7a9e"); sg.addColorStop(0.7, "#5a9ebe");
+        sg.addColorStop(0.85, "#87CEEB"); sg.addColorStop(1, "#d4a060");
+      }
       x.fillStyle = sg; x.fillRect(0, 0, W, vh);
-
-      // Sun glow
-      const sunX = W * 0.75, sunY = vh * 0.15;
-      const sunG = x.createRadialGradient(sunX, sunY, 0, sunX, sunY, 80);
-      sunG.addColorStop(0, "rgba(255,240,200,0.25)"); sunG.addColorStop(0.5, "rgba(255,220,180,0.1)"); sunG.addColorStop(1, "rgba(255,200,150,0)");
-      x.fillStyle = sunG; x.fillRect(sunX - 80, sunY - 80, 160, 160);
+      if (isNight) {
+        // Stars
+        for (let si = 0; si < 40; si++) {
+          const sx2 = ((si * 137.5 + 23) % W), sy2 = ((si * 89.3 + 47) % (vh * 0.5));
+          const tw = 0.5 + (si % 5 < 2 ? Math.sin(fc * 0.03 + si) * 0.3 : 0);
+          x.fillStyle = `rgba(255,255,255,${0.5 + tw * 0.4})`;
+          x.fillRect(sx2, sy2, si % 3 === 0 ? 2 : 1, si % 3 === 0 ? 2 : 1);
+        }
+        // Moon
+        const moonX = W * 0.8, moonY = vh * 0.12;
+        x.fillStyle = "rgba(200,210,230,0.8)"; x.beginPath(); x.arc(moonX, moonY, 15, 0, Math.PI * 2); x.fill();
+        x.fillStyle = "rgba(220,230,245,0.3)"; x.beginPath(); x.arc(moonX, moonY, 25, 0, Math.PI * 2); x.fill();
+      } else {
+        // Sun glow
+        const sunX = W * 0.75, sunY = vh * 0.15;
+        const sunG = x.createRadialGradient(sunX, sunY, 0, sunX, sunY, 80);
+        sunG.addColorStop(0, "rgba(255,240,200,0.25)"); sunG.addColorStop(0.5, "rgba(255,220,180,0.1)"); sunG.addColorStop(1, "rgba(255,200,150,0)");
+        x.fillStyle = sunG; x.fillRect(sunX - 80, sunY - 80, 160, 160);
+      }
 
       const rn = [];
       const stp = TS / GR, vD = 900;
@@ -1025,6 +1051,10 @@ export default function Game() {
             if (bi >= bands.length - 1) { r = bands[bands.length-1][1]; g = bands[bands.length-1][2]; b = bands[bands.length-1][3]; }
             else { const lo = bands[bi], hi = bands[bi+1]; const t = Math.max(0, Math.min(1, (h - lo[0]) / (hi[0] - lo[0]))); r = lo[1] + (hi[1] - lo[1]) * t; g = lo[2] + (hi[2] - lo[2]) * t; b = lo[3] + (hi[3] - lo[3]) * t; }
           }
+          if (isNight) {
+            const nf = (cr === 4 && (h < 0 || (h > 30 && Math.sin(i * 2.3 + j * 0.7) > 0.3))) ? 0.8 : 0.3;
+            r *= nf; g *= nf; b *= nf;
+          }
           const sh = Math.max(0.3, 1 - dist / vD) * nShade;
           rn.push({ d: ((p00?.d || 9999) + (p10?.d || 9999)) / 2, f() {
             x.fillStyle = `rgba(${Math.min(255, r * sh) | 0},${Math.min(255, g * sh) | 0},${Math.min(255, b * sh) | 0},${Math.max(0.3, 1 - dist / vD)})`;
@@ -1051,13 +1081,14 @@ export default function Game() {
         const pB = proj(m.x, m.bY, m.z + m.w, cam, vh);
         if (!pP) return;
         const iceFaceColors = [[90,110,140],[110,135,170],[140,165,200],[160,180,210]];
-        [[pL, pF, 0.6, 0], [pF, pR, 0.8, 1], [pR, pB, 0.5, 2], [pB, pL, 0.4, 3]].forEach(([a, b, sh, fi]) => {
+        [[pL, pF, 0.6, 0], [pF, pR, 0.8, 1], [pR, pB, 0.5, 2], [pB, pL, 0.4, 3]].forEach(([a, b, sh0, fi]) => {
           if (!a || !b) return;
+          const sh = isNight ? sh0 * 0.35 : sh0;
           rn.push({ d: (a.d + pP.d) / 2, f() {
             x.globalAlpha = al;
             if (m.icy) {
               const ic = iceFaceColors[fi];
-              x.fillStyle = `rgb(${ic[0] * sh + 40 | 0},${ic[1] * sh + 30 | 0},${ic[2] * sh + 20 | 0})`;
+              x.fillStyle = `rgb(${ic[0] * sh + (isNight ? 10 : 40) | 0},${ic[1] * sh + (isNight ? 8 : 30) | 0},${ic[2] * sh + (isNight ? 5 : 20) | 0})`;
             } else if (m.volcanic) {
               x.fillStyle = `rgb(${50 * sh + 15 | 0},${40 * sh + 12 | 0},${35 * sh + 10 | 0})`;
             } else {
@@ -1275,7 +1306,8 @@ export default function Game() {
           const totalH = maxT - minB;
           // Front face — layered rock with per-segment color variation
           const cv = ((a.ord * 7 + 13) % 21 - 10);
-          const thirds = [[minB, minB + totalH / 3, 80+cv, 40+cv/2, 25+cv/3], [minB + totalH / 3, minB + totalH * 2 / 3, 175+cv, 75+cv/2, 35+cv/3], [minB + totalH * 2 / 3, maxT, 215+cv, 145+cv/2, 80+cv/3]];
+          const nm = isNight ? 0.35 : 1;
+          const thirds = [[minB, minB + totalH / 3, (80+cv)*nm, (40+cv/2)*nm, (25+cv/3)*nm], [minB + totalH / 3, minB + totalH * 2 / 3, (175+cv)*nm, (75+cv/2)*nm, (35+cv/3)*nm], [minB + totalH * 2 / 3, maxT, (215+cv)*nm, (145+cv/2)*nm, (80+cv/3)*nm]];
           thirds.forEach(([yB, yT, lr, lg, lb]) => {
             const cyB = Math.max(yB, Math.max(a.bY, b.bY));
             const cyT = Math.min(yT, Math.min(a.bY + a.ht, b.bY + b.ht));
@@ -1333,7 +1365,7 @@ export default function Game() {
           // Inner bright stroke
           x.strokeStyle = isN ? "rgba(50,255,50,1)" : "rgba(255,200,50,0.15)";
           x.lineWidth = isN ? Math.max(3, s * 0.1) : Math.max(1, s * 0.06);
-          if (isN) { x.shadowColor = "rgba(50,255,50,0.6)"; x.shadowBlur = 12; }
+          if (isN) { x.shadowColor = "rgba(50,255,50,0.6)"; x.shadowBlur = isNight ? 18 : 12; }
           x.beginPath(); x.ellipse(p.sx, p.sy, s, s * 0.35, 0, 0, Math.PI * 2); x.stroke();
           // Second inner ring for next gate
           if (isN) {
@@ -1369,7 +1401,7 @@ export default function Game() {
 
       // Track rails (left and right lines along gate edges)
       if (!iB && crs.length > 1) {
-        x.strokeStyle = "rgba(255,180,50,0.2)";
+        x.strokeStyle = isNight ? "rgba(255,180,50,0.5)" : "rgba(255,180,50,0.2)";
         x.lineWidth = 1.5;
         for (let i = 0; i < crs.length; i++) {
           const g1 = crs[i], g2 = crs[(i + 1) % crs.length];
@@ -1397,7 +1429,7 @@ export default function Game() {
           x.rotate(Math.PI / 4 + spin);
           if (c.active) {
             // Golden box
-            x.shadowColor = "rgba(255,200,50,0.5)"; x.shadowBlur = 8;
+            x.shadowColor = "rgba(255,200,50,0.5)"; x.shadowBlur = isNight ? 12 : 8;
             x.fillStyle = "rgb(250,190,50)";
             x.fillRect(-s, -s, s * 2, s * 2);
             x.shadowBlur = 0;
@@ -1430,7 +1462,7 @@ export default function Game() {
           const spin = Math.sin(fc * 0.03 + c.x) * 0.2;
           x.rotate(Math.PI / 4 + spin);
           if (c.active) {
-            x.shadowColor = "rgba(255,200,50,0.5)"; x.shadowBlur = 8;
+            x.shadowColor = "rgba(255,200,50,0.5)"; x.shadowBlur = isNight ? 12 : 8;
             x.fillStyle = "rgb(250,190,50)";
             x.fillRect(-s, -s, s * 2, s * 2);
             x.shadowBlur = 0;
@@ -1445,6 +1477,36 @@ export default function Game() {
         }});
       });
 
+      // Contrails — smoke trails behind planes
+      rs.forEach(r => {
+        if (r.trail.length < 2) return;
+        const tc = r.bt > 0 ? [50,255,100] : r.st > 0 ? [255,200,50] : [255,255,255];
+        for (let ti = 0; ti < r.trail.length - 1; ti++) {
+          const t1 = r.trail[ti], t2 = r.trail[ti + 1];
+          const p1 = proj(t1.x, t1.y, t1.z, cam, vh), p2 = proj(t2.x, t2.y, t2.z, cam, vh);
+          if (!p1 || !p2 || p1.d > 400 || p2.d > 400) continue;
+          const age = (r.trail.length - 1 - ti) / r.trail.length;
+          const al = age * 0.3;
+          const lw = 0.5 + age * 1.5;
+          rn.push({ d: (p1.d + p2.d) / 2, f() {
+            x.strokeStyle = `rgba(${tc[0]},${tc[1]},${tc[2]},${al})`; x.lineWidth = lw;
+            x.beginPath(); x.moveTo(p1.sx, p1.sy); x.lineTo(p2.sx, p2.sy); x.stroke();
+          }});
+        }
+      });
+      // Firework particles
+      fireworks.forEach(f => {
+        const p = proj(f.x, f.y, f.z, cam, vh);
+        if (!p || p.d > 500) return;
+        const al = f.life / f.maxLife;
+        rn.push({ d: p.d, f() {
+          x.globalAlpha = al;
+          x.fillStyle = f.color;
+          x.beginPath(); x.arc(p.sx, p.sy, Math.max(1, f.size * p.sc), 0, Math.PI * 2); x.fill();
+          x.globalAlpha = 1;
+        }});
+      });
+
       // Other racers — angular sci-fi fighter
       rs.forEach(r => {
         if (r === vw || r.cr || r.fn) return;
@@ -1452,7 +1514,7 @@ export default function Game() {
         if (!p || p.d > 700 || p.d < 5) return;
         const s = Math.max(3, 11 * p.sc);
         rn.push({ d: p.d, f() {
-          x.save(); x.translate(p.sx, p.sy); x.rotate(-r.rl);
+          x.save(); x.translate(p.sx, p.sy); x.rotate(-r.rl + (r.trickRoll || 0));
           const u = s / 11;
           // Star glow
           if (r.st > 0) { x.fillStyle = "rgba(255,200,50,0.2)"; x.beginPath(); x.arc(0, 0, 16 * u, 0, Math.PI * 2); x.fill(); }
@@ -1668,7 +1730,11 @@ export default function Game() {
 
       // Distance fog overlay — smooth horizon fade
       const fogG = x.createRadialGradient(W / 2, vh * 0.6, vh * 0.15, W / 2, vh * 0.4, vh * 0.9);
-      fogG.addColorStop(0, "rgba(180,200,220,0)"); fogG.addColorStop(0.6, "rgba(180,200,220,0.08)"); fogG.addColorStop(1, "rgba(180,200,220,0.35)");
+      if (isNight) {
+        fogG.addColorStop(0, "rgba(10,15,30,0)"); fogG.addColorStop(0.6, "rgba(10,15,30,0.12)"); fogG.addColorStop(1, "rgba(10,15,30,0.45)");
+      } else {
+        fogG.addColorStop(0, "rgba(180,200,220,0)"); fogG.addColorStop(0.6, "rgba(180,200,220,0.08)"); fogG.addColorStop(1, "rgba(180,200,220,0.35)");
+      }
       x.fillStyle = fogG; x.fillRect(0, 0, W, vh);
 
       // Screen shake offset
@@ -1677,7 +1743,7 @@ export default function Game() {
       // Own plane — angular sci-fi fighter
       if (!vw.cr && !vw.fn) {
         const sx = W / 2, sy = vh / 2 + (i2 ? 14 : 28);
-        x.save(); x.translate(sx, sy - vw.p * (i2 ? 10 : 18)); x.rotate(-vw.rl);
+        x.save(); x.translate(sx, sy - vw.p * (i2 ? 10 : 18)); x.rotate(-vw.rl + (vw.trickRoll || 0));
         const s = i2 ? 0.85 : 1.3;
         // Star power glow (behind plane)
         if (vw.st > 0) { x.fillStyle = `rgba(255,200,50,${0.1 + Math.sin(fc * 0.3) * 0.05})`; x.beginPath(); x.arc(0, 0, 22 * s, 0, Math.PI * 2); x.fill(); }
@@ -1731,7 +1797,7 @@ export default function Game() {
         x.strokeStyle = "rgba(255,255,255,0.5)"; x.lineWidth = 1; x.beginPath(); x.moveTo(-1.5*s, -9*s); x.lineTo(1.5*s, -9*s); x.stroke();
         // Wing tip lights — pulsing
         const pulse = 0.7 + Math.sin(fc * 0.15) * 0.3;
-        x.shadowColor = vw.ac; x.shadowBlur = 6;
+        x.shadowColor = vw.ac; x.shadowBlur = isNight ? 10 : 6;
         x.globalAlpha = pulse; x.fillStyle = vw.ac;
         x.beginPath(); x.arc(-22*s, 3*s, 1.5*s, 0, Math.PI * 2); x.fill();
         x.beginPath(); x.arc(22*s, 3*s, 1.5*s, 0, Math.PI * 2); x.fill();
@@ -1778,6 +1844,17 @@ export default function Game() {
         x.fillStyle = `rgba(60,130,255,${ba})`;
         x.fillRect(0, 0, W, vh);
       }
+
+      // Announcements — floating text callouts
+      announcements.forEach((a, ai) => {
+        const al = a.timer < 30 ? a.timer / 30 : 1;
+        x.globalAlpha = al;
+        const sz = (a.text === "FINAL LAP!" || a.text === "1ST PLACE!") ? (i2 ? 20 : 32) : (i2 ? 14 : 22);
+        x.font = `bold ${sz}px Georgia`;
+        x.fillStyle = a.color; x.textAlign = "center";
+        x.fillText(a.text, W / 2, vh * 0.35 - a.y + ai * (i2 ? 18 : 25));
+        x.textAlign = "start"; x.globalAlpha = 1;
+      });
 
       // Undo screen shake
       if (shakeX || shakeY) { x.translate(-shakeX, -shakeY); }
@@ -1890,6 +1967,19 @@ export default function Game() {
       if (pl[1] && i2) updatePlayer(pl[1], cm[1], ky.current, "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Slash", "Period", "ShiftRight");
       rs.filter(r => r.npc).forEach(r => updateNPC(r));
 
+      // Contrails — record positions every 3 frames
+      if (fc % 3 === 0) rs.forEach(r => { if (!r.cr && !r.fn) { r.trail.push({ x: r.x, y: r.y, z: r.z }); if (r.trail.length > 30) r.trail.shift(); } });
+      // Tick announcements
+      announcements.forEach(a => { a.timer--; a.y += 0.5; });
+      announcements = announcements.filter(a => a.timer > 0);
+      // Tick fireworks
+      fireworks.forEach(f => { f.x += f.vx; f.y += f.vy; f.z += f.vz; f.vx *= 0.97; f.vy *= 0.97; f.vz *= 0.97; f.vy -= 0.05; f.life--; });
+      fireworks = fireworks.filter(f => f.life > 0);
+      // Victory roll
+      if (victoryTarget && victoryFrame < 120) { victoryTarget.rl = Math.sin(fc * 0.15) * 30 * D; victoryFrame++; }
+      // Race start announcement
+      if (!iB && started && fc === 241) addAnnouncement("GO GO GO!", "#22c55e");
+
       // Homing missiles
       pj.forEach(pr => {
         if (!pr.hm || !pr.tg) return;
@@ -1927,6 +2017,7 @@ export default function Game() {
               // Throw at center (< 20 units) if not already thrown by this tornado
               if (d < 20 && !st.hitRacers.includes(r)) {
                 st.hitRacers.push(r);
+                if (!r.npc) addAnnouncement("CAUGHT!", "#06b6d4");
                 r.yw += Math.PI; // flip direction
                 r.sp = 2;
                 const sy2 = Math.sin(r.yw), cy2 = Math.cos(r.yw);
@@ -1939,6 +2030,7 @@ export default function Game() {
               st.hit.add(r);
               r.sp = 1; r.bt = 0;
               r.zap = 60;
+              if (!r.npc) addAnnouncement("ZAPPED!", "#a855f7");
             }
           }
         });
@@ -2152,6 +2244,9 @@ export default function Game() {
             </button>
           ))}
         </div>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "12px" }}>
+          <button onClick={() => setNight(n => !n)} style={{ padding: "8px 16px", background: night ? "rgba(251,191,36,0.15)" : "rgba(255,255,255,0.03)", border: night ? "2px solid #fbbf24" : "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: night ? "#fbbf24" : "#64748b", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>{night ? "🌙 NIGHT MODE ON" : "🌙 NIGHT MODE"}</button>
+        </div>
         <button onClick={() => setSc("pick")} style={{ padding: "8px 20px", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#64748b", fontSize: "12px", cursor: "pointer" }}>Back</button>
       </div>
     );
@@ -2169,6 +2264,7 @@ export default function Game() {
             <div><b style={{ color: "#e2e8f0" }}>S</b> Dive</div>
             <div><b style={{ color: "#e2e8f0" }}>A/D</b> Turn</div>
             <div><b style={{ color: "#e2e8f0" }}>Space</b> Weapon</div>
+            <div><b style={{ color: "#06b6d4" }}>Double-tap A/D</b> Barrel Roll</div>
           </div>
         </div>
         <div style={{ background: "rgba(0,0,0,0.25)", borderRadius: "12px", padding: "16px 20px", border: "2px solid #ef444444", flex: "1", minWidth: "180px", textAlign: "left" }}>
@@ -2178,6 +2274,7 @@ export default function Game() {
             <div><b style={{ color: "#e2e8f0" }}>↓</b> Dive</div>
             <div><b style={{ color: "#e2e8f0" }}>←/→</b> Turn</div>
             <div><b style={{ color: "#e2e8f0" }}>Shift</b> Weapon</div>
+            <div><b style={{ color: "#06b6d4" }}>Double-tap ←/→</b> Barrel Roll</div>
           </div>
         </div>
       </div>
