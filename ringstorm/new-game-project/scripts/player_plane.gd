@@ -182,15 +182,17 @@ func _physics_process(delta):
 			trick_timer = 60
 
 	# --- MOVE --- ported from moveRacer() lines 911-915
+	# Browser: x += sy*cp*sp, z += cy*cp*sp, y += sp2*sp
+	# In Godot -Z is forward, so negate Z to match visual direction
 	var cp = cos(pitch_angle)
-	var sp = sin(pitch_angle)
+	var sp2 = sin(pitch_angle)
 	var cy = cos(yaw_angle)
 	var sy = sin(yaw_angle)
-	velocity = Vector3(sy * cp, sp, cy * cp) * current_speed
+	velocity = Vector3(sy * cp, sp2, -cy * cp) * current_speed
 	move_and_slide()
 
-	# Apply visual rotation (yaw + pitch + roll + trick roll)
-	rotation = Vector3(pitch_angle, yaw_angle, roll_value + trick_roll)
+	# Apply visual rotation — negate yaw for Godot convention (-Z forward)
+	rotation = Vector3(-pitch_angle, -yaw_angle, -(roll_value + trick_roll))
 
 	# --- FIRE WEAPON --- ported from lines 1057-1086
 	if fire_cooldown > 0:

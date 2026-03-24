@@ -7,8 +7,22 @@ var npc_planes: Array = []
 var race_mgr: Node
 var hud_node: CanvasLayer
 var course: Node3D
+var menu: CanvasLayer
+var game_nodes: Array = []  # Track nodes to clean up on restart
 
 func _ready():
+	# Show menu first — game starts when player clicks a mode
+	menu = CanvasLayer.new()
+	menu.name = "Menu"
+	menu.set_script(load("res://scripts/menu_ui.gd"))
+	add_child(menu)
+	menu.start_race.connect(_on_start_race)
+
+func _on_start_race(num_players: int):
+	menu.hide_menu()
+	_create_game(num_players)
+
+func _create_game(num_players: int):
 	_create_environment()
 	_create_course()
 	_create_hud()
@@ -194,12 +208,12 @@ func _setup_race():
 		var oz = -row * 12.0 - 20.0
 		var pos = start + perp * ox + dir * oz + Vector3.UP * 3.0
 		r.global_position = pos
-		# Face toward first gate
+		# Face toward first gate — yaw_angle uses browser convention (atan2(dx,dz))
+		# Visual rotation is negated in the racer scripts
 		var face_yaw = atan2(dir.x, dir.z)
-		if r is CharacterBody3D:
-			if r.has_method("on_race_start"):
-				r.yaw_angle = face_yaw
-			r.rotation.y = face_yaw
+		if r.has_method("set") and "yaw_angle" in r:
+			r.yaw_angle = face_yaw
+		r.rotation.y = -face_yaw  # Negate for Godot visual
 
 	# Wire references
 	player_plane.race_course = course

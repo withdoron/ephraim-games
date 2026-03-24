@@ -128,7 +128,7 @@ func _physics_process(delta):
 				var o_progress = other.current_lap * Settings.num_gates + other.current_gate
 				var my_progress = current_lap * Settings.num_gates + current_gate
 				if o_progress >= my_progress:
-					var beh = other.global_position + other.transform.basis.z * 10.0
+					var beh = other.global_position - other.transform.basis.z * 10.0
 					tx = tx * 0.7 + beh.x * 0.3
 					tz = tz * 0.7 + beh.z * 0.3
 					break
@@ -174,15 +174,16 @@ func _physics_process(delta):
 	current_speed += (ts - current_speed) / 40.0
 
 	# Move — ported from moveRacer() lines 911-915
+	# Negate Z for Godot's -Z forward convention
 	var cp = cos(pitch_angle)
-	var sp = sin(pitch_angle)
+	var sp2 = sin(pitch_angle)
 	var cy = cos(yaw_angle)
 	var sy = sin(yaw_angle)
-	velocity = Vector3(sy * cp, sp, cy * cp) * current_speed
+	velocity = Vector3(sy * cp, sp2, -cy * cp) * current_speed
 	move_and_slide()
 
-	# Apply visual rotation
-	rotation = Vector3(pitch_angle, yaw_angle, roll_value)
+	# Apply visual rotation — negate for Godot convention
+	rotation = Vector3(-pitch_angle, -yaw_angle, -roll_value)
 
 	# NPC weapon use — ported from lines 995-997
 	if weapon != "" and randf() < 0.01:
