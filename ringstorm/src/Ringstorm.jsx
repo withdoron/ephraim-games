@@ -24,6 +24,7 @@ export default function Game() {
   const [cr, setCr] = useState(0);
   const [paused, setPaused] = useState(false);
   const [restartKey, setRestartKey] = useState(0);
+  const [night, setNight] = useState(false);
   const pauseRef = useRef(false);
   pauseRef.current = paused;
 
@@ -37,6 +38,7 @@ export default function Game() {
     const x = cn.getContext("2d");
     const W = cn.width = 800, H = cn.height = 500;
     const i2 = np === 2, VH = i2 ? 250 : 500, iB = sc === "battle";
+    const isNight = night;
 
     // Course gates
     const crs = [];
@@ -500,6 +502,7 @@ export default function Game() {
         ng: 0, lp: 0, fn: 0, ft: 0, fp: 0, hf: 0,
         nw: Math.random() * 6, ns: 0.7 + Math.random() * 0.3, lv: 3, kl: 0, zap: 0, tumble: 0,
         slDraft: 0, slTarget: null, slBoost: 0, scUsed: new Set(),
+        trail: [], trickRoll: 0, trickDir: 0, trickTimer: 0, trickFrame: 0, lastLF: 0, lastRF: 0,
       };
     });
 
@@ -534,6 +537,11 @@ export default function Game() {
     let tsunami = { active: false, triggered: false, angle: 0, progress: 0, duration: 420, spray: [] };
     let earthquake = { active: false, triggered: false, progress: 0, duration: 360, intensity: 0, rocks: [] };
     let replayBuf = [], replayMode = false, replayFrame = 0, firstFinishFrame = 0;
+    let announcements = [], fireworks = [], victoryTarget = null, victoryFrame = 0;
+    function addAnnouncement(text, color) {
+      if (announcements.some(a => a.text === text && a.timer > 60)) return;
+      announcements.push({ text, color, timer: 90, y: 0 });
+    }
 
     function boom(p) {
       if (p.st > 0) return;
@@ -542,6 +550,7 @@ export default function Game() {
       for (let i = 0; i < 4; i++) p.ep.push({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 2, vy: Math.random() * 1.5, vz: (Math.random() - 0.5) * 2, s: 7 + Math.random() * 10, l: 30 + Math.random() * 20, ml: 50, t: 1 });
       for (let i = 0; i < 6; i++) p.ep.push({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 14, vy: Math.random() * 8 + 3, vz: (Math.random() - 0.5) * 14, s: 2 + Math.random() * 2, l: 10 + Math.random() * 10, ml: 20, t: 2 });
       if (iB) p.lv--;
+      if (!p.npc) addAnnouncement("CRASH!", "#ef4444");
     }
 
     function boomFrom(p, attacker) { boom(p); if (iB && attacker && attacker !== p) attacker.kl++; }
@@ -567,6 +576,7 @@ export default function Game() {
       }
       p.p = 0; p.rl = 0; p.sp = 4; p.th = 0.5; p.tp = 0; p.tr = 0; p.wp = null; p.st = 0; p.bt = 0;
       p.slDraft = 0; p.slTarget = null; p.slBoost = 0;
+      p.trail = []; p.trickRoll = 0; p.trickFrame = 0; p.trickTimer = 0;
     }
 
     function checkSlipstream(r) {
@@ -2046,7 +2056,7 @@ export default function Game() {
     function loop() { mainUpdate(); render(); af.current = requestAnimationFrame(loop); }
     af.current = requestAnimationFrame(loop);
     return () => { if (af.current) cancelAnimationFrame(af.current); };
-  }, [sc, np, cr, restartKey]);
+  }, [sc, np, cr, restartKey, night]);
 
   // Key listeners
   useEffect(() => {
