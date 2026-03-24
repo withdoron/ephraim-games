@@ -150,7 +150,6 @@ func _add_course_terrain(_course_idx: int):
 	# Terrain simplified to just colored ground for now
 	# TODO: add course-specific obstacles (canyon walls, islands, etc.) once core racing is solid
 	pass
-		add_child(m); game_nodes.append(m)
 
 func _create_course(course_idx: int):
 	course = Node3D.new()
