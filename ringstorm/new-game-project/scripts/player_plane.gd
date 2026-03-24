@@ -1,39 +1,90 @@
 extends CharacterBody3D
+# Player flight controller — ported from Ringstorm.jsx updatePlayer() lines 1003-1100
 
-# Settings (match browser version defaults)
-@export var max_speed: float = 30.0
-@export var turn_speed: float = 2.5
-@export var pitch_speed: float = 1.5
-@export var roll_visual_speed: float = 3.0
-@export var brake_strength: float = 0.5
-@export var min_brake_speed: float = 5.0
-@export var deadzone: float = 0.3
-
-# State
+# Flight state — matches browser racer properties (lines 623-633)
+var max_speed: float = 6.0
 var current_speed: float = 0.0
-var target_roll: float = 0.0
-var current_roll: float = 0.0
-var current_pitch: float = 0.0
+var pitch_angle: float = 0.0   # r.p
+var yaw_angle: float = 0.0    # r.yw
+var roll_value: float = 0.0   # r.rl
+var target_pitch: float = 0.0 # r.tp
+var target_roll: float = 0.0  # r.tr
+var throttle: float = 0.0     # r.th
 
 # Race state
 var current_gate: int = 0
 var current_lap: int = 0
 var race_finished: bool = false
-var race_course: Node3D = null  # Set by main_setup
-var hud: CanvasLayer = null  # Set by main_setup
+var finish_time: int = 0
+var finish_position: int = 0
+var is_npc: bool = false
+
+# Status effects
+var boost_timer: int = 0
+var star_timer: int = 0
+var tumble_timer: int = 0
+var slipstream_draft: int = 0
+var slipstream_boost: int = 0
+
+# Crash state — ported from boom()/resp() lines 672-706
+var is_crashed: bool = false
+var crash_timer: int = 0
+
+# Weapon
+var weapon: String = ""
+var weapon_ammo: int = 0
+var fire_cooldown: int = 0
+
+# Barrel roll trick — ported from lines 1040-1052
+var trick_roll: float = 0.0
+var trick_dir: int = 0
+var trick_timer: int = 0
+var trick_frame: int = 0
+var last_left_frame: int = 0
+var last_right_frame: int = 0
+
+# Battle
+var lives: int = 3
+var kills: int = 0
+
+# Trail
+var trail: Array = []
+
+# References
+var race_course: Node = null
+var race_manager: Node = null
+var hud: Node = null
+var all_racers: Array = []
 
 # Nodes
-@onready var mesh: MeshInstance3D = $MeshInstance3D
 @onready var camera: Camera3D = $Camera3D
 
 func _ready():
-	current_speed = max_speed
+	max_speed = Settings.player_speed
+
+func on_race_start():
+	throttle = 1.0
+	current_speed = Settings.start_speed
 
 func _physics_process(delta):
-	# Get input (keyboard + gamepad)
+	if race_finished:
+		if camera:
+			_update_camera(delta)
+		return
+	if is_crashed:
+		crash_timer -= 1
+		if crash_timer <= 0:
+			_respawn()
+		if camera:
+			_update_camera(delta)
+		return
+
+	var S = Settings
+
+	# --- INPUT --- ported from updatePlayer lines 1014-1035
 	var turn_input = 0.0
 	var pitch_input = 0.0
-	var fire = false
+	var want_fire = false
 	var brake = false
 
 	# Keyboard
@@ -44,80 +95,187 @@ func _physics_process(delta):
 	if Input.is_key_pressed(KEY_W):
 		pitch_input += 1.0
 	if Input.is_key_pressed(KEY_S):
-		pitch_input -= 1.0
+		pitch_input -= 0.8  # Slightly weaker dive, matching browser -20*D vs 25*D
 	if Input.is_key_pressed(KEY_SPACE):
-		fire = true
+		want_fire = true
 	if Input.is_key_pressed(KEY_SHIFT):
 		brake = true
 
-	# Gamepad (player 1 = device 0)
+	# Gamepad — separate from keyboard (no injection)
 	var gp_x = Input.get_joy_axis(0, JOY_AXIS_LEFT_X)
 	var gp_y = Input.get_joy_axis(0, JOY_AXIS_LEFT_Y)
-
-	# Apply deadzone — gamepad overrides keyboard when active
-	if abs(gp_x) > deadzone:
-		turn_input = -gp_x
-	if abs(gp_y) > deadzone:
-		pitch_input = -gp_y
-
-	# Gamepad buttons
+	if abs(gp_x) > S.deadzone_x:
+		turn_input = -gp_x * S.stick_sensitivity
+	if abs(gp_y) > S.deadzone_y:
+		pitch_input = -gp_y * S.pitch_sensitivity
+		if S.invert_y_p1:
+			pitch_input = -pitch_input
 	if Input.is_joy_button_pressed(0, JOY_BUTTON_A):
-		fire = true
-	if Input.is_joy_button_pressed(0, JOY_BUTTON_LEFT_SHOULDER):
-		brake = true
+		want_fire = true
 	var gp_lt = Input.get_joy_axis(0, JOY_AXIS_TRIGGER_LEFT)
-	if gp_lt > 0.3:
+	if gp_lt > 0.3 or Input.is_joy_button_pressed(0, JOY_BUTTON_LEFT_SHOULDER):
 		brake = true
 
-	# Apply turn (yaw)
-	rotation.y += turn_input * turn_speed * delta
+	# --- SPEED --- ported from lines 1014-1019
+	throttle = 1.0
+	var ts = 1.0 + throttle * (max_speed - 1.0)
+	if boost_timer > 0:
+		ts = max_speed * S.boost_multiplier
+		boost_timer -= 1
+	if star_timer > 0:
+		ts = max(ts, max_speed * S.star_multiplier)
+		star_timer -= 1
+	if slipstream_boost > 0:
+		ts = max(ts, max_speed * S.star_multiplier)
+		slipstream_boost -= 1
+	current_speed += (ts - current_speed) * delta * 2.0
 
-	# Apply pitch
-	current_pitch = lerp(current_pitch, pitch_input * pitch_speed, delta * 3.0)
-	rotation.x = clamp(rotation.x + current_pitch * delta, deg_to_rad(-45), deg_to_rad(45))
-
-	# Visual roll (banking into turns)
-	target_roll = turn_input * deg_to_rad(35)
-	current_roll = lerp(current_roll, target_roll, delta * roll_visual_speed)
-	rotation.z = current_roll
-
-	# Speed
+	# Brake — ported from browser brake system
 	if brake:
-		current_speed = lerp(current_speed, min_brake_speed, brake_strength * delta * 4.0)
-	else:
-		current_speed = lerp(current_speed, max_speed, delta * 2.0)
+		current_speed = lerp(current_speed, S.min_brake_speed, S.brake_strength * delta * 4.0)
+		if current_speed < S.min_brake_speed:
+			current_speed = S.min_brake_speed
 
-	# Move forward along the plane's facing direction
-	var forward = -transform.basis.z
-	velocity = forward * current_speed
+	# --- TURN & PITCH --- ported from lines 1022-1035
+	var tumble_mul = 0.2 if tumble_timer > 0 else 1.0
+	target_roll = turn_input * deg_to_rad(S.turn_rate) * tumble_mul
+	if pitch_input != 0:
+		target_pitch = pitch_input * deg_to_rad(S.pitch_rate) * tumble_mul
+	elif turn_input == 0:
+		target_pitch *= 0.7  # Decay pitch when no input
+	else:
+		target_pitch *= 0.9
+
+	roll_value += (target_roll - roll_value) * delta * 4.0
+	pitch_angle += (target_pitch - pitch_angle) * delta * 3.0
+	yaw_angle += (-roll_value * 2.2 * (current_speed / max_speed)) * delta
+	if tumble_timer > 0:
+		tumble_timer -= 1
+
+	# --- BARREL ROLL --- ported from lines 1040-1052
+	if trick_timer > 0:
+		trick_timer -= 1
+	# Keyboard double-tap
+	var frame = Engine.get_physics_frames()
+	if Input.is_action_just_pressed("ui_left") or (Input.is_key_pressed(KEY_A) and not _prev_left):
+		if frame - last_left_frame < 18 and trick_timer <= 0 and trick_frame <= 0:
+			trick_frame = 30; trick_dir = 1; trick_roll = 0.0
+		last_left_frame = frame
+	if Input.is_action_just_pressed("ui_right") or (Input.is_key_pressed(KEY_D) and not _prev_right):
+		if frame - last_right_frame < 18 and trick_timer <= 0 and trick_frame <= 0:
+			trick_frame = 30; trick_dir = -1; trick_roll = 0.0
+		last_right_frame = frame
+	_prev_left = Input.is_key_pressed(KEY_A)
+	_prev_right = Input.is_key_pressed(KEY_D)
+	# Gamepad barrel roll (B = right, X = left)
+	if Input.is_joy_button_pressed(0, JOY_BUTTON_B) and not _prev_gp_roll_r and trick_timer <= 0 and trick_frame <= 0:
+		trick_frame = 30; trick_dir = -1; trick_roll = 0.0
+	if Input.is_joy_button_pressed(0, JOY_BUTTON_X) and not _prev_gp_roll_l and trick_timer <= 0 and trick_frame <= 0:
+		trick_frame = 30; trick_dir = 1; trick_roll = 0.0
+	_prev_gp_roll_r = Input.is_joy_button_pressed(0, JOY_BUTTON_B)
+	_prev_gp_roll_l = Input.is_joy_button_pressed(0, JOY_BUTTON_X)
+	if trick_frame > 0:
+		trick_roll += (PI * 2.0 / 30.0) * trick_dir
+		trick_frame -= 1
+		if trick_frame <= 0:
+			trick_roll = 0.0
+			trick_timer = 60
+
+	# --- MOVE --- ported from moveRacer() lines 911-915
+	var cp = cos(pitch_angle)
+	var sp = sin(pitch_angle)
+	var cy = cos(yaw_angle)
+	var sy = sin(yaw_angle)
+	velocity = Vector3(sy * cp, sp, cy * cp) * current_speed
 	move_and_slide()
 
-	# Check gate passing
-	_check_gates()
+	# Apply visual rotation (yaw + pitch + roll + trick roll)
+	rotation = Vector3(pitch_angle, yaw_angle, roll_value + trick_roll)
 
-	# Update chase camera
+	# --- FIRE WEAPON --- ported from lines 1057-1086
+	if fire_cooldown > 0:
+		fire_cooldown -= 1
+	if want_fire and fire_cooldown <= 0 and weapon != "":
+		fire_cooldown = int(S.fire_cooldown)
+		if weapon == "boost":
+			boost_timer = 120
+			weapon = ""
+		elif weapon == "star":
+			star_timer = 180
+			weapon = ""
+		else:
+			weapon = ""  # TODO: implement projectile weapons
+
+	# Gate check
+	_check_gate()
+
+	# Trail
+	if Engine.get_physics_frames() % 3 == 0:
+		trail.append(global_position)
+		if trail.size() > 30:
+			trail.pop_front()
+
+	# Camera
 	_update_camera(delta)
 
-func _check_gates():
+	# Update HUD
+	if hud and race_manager:
+		var pos = race_manager.get_race_position(self)
+		hud.update_hud(current_lap, Settings.total_laps, current_gate, Settings.num_gates, race_finished)
+
+# Edge detection state
+var _prev_left: bool = false
+var _prev_right: bool = false
+var _prev_gp_roll_r: bool = false
+var _prev_gp_roll_l: bool = false
+
+func _check_gate():
 	if not race_course or race_finished:
 		return
 	var gate_pos = race_course.get_gate_position(current_gate)
 	var dist = global_position.distance_to(gate_pos)
+	# Ported from checkGate: dist < sz + 18 → scaled to Godot
 	if dist < race_course.gate_size + 5.0:
-		current_gate += 1
-		if current_gate >= race_course.num_gates:
-			current_gate = 0
-			current_lap += 1
-			if current_lap >= race_course.total_laps:
-				race_finished = true
-		race_course.update_gate_colors(current_gate if not race_finished else -1)
-		if hud:
-			hud.update_hud(current_lap, race_course.total_laps, current_gate, race_course.num_gates, race_finished)
+		# Trick boost — ported from line 862
+		if trick_roll != 0.0:
+			boost_timer = 60
+		if race_manager:
+			race_manager.on_racer_passed_gate(self)
+
+func crash():
+	# Ported from boom() lines 672-680
+	if star_timer > 0:
+		return
+	is_crashed = true
+	crash_timer = int(Settings.crash_respawn_time)
+	visible = false
+
+func _respawn():
+	# Ported from resp() lines 684-706
+	is_crashed = false
+	visible = true
+	if race_course and race_course.gates.size() > 1:
+		var g = race_course.get_gate_position(current_gate)
+		var prev_idx = (current_gate - 1 + Settings.num_gates) % Settings.num_gates
+		var v = race_course.get_gate_position(prev_idx)
+		global_position = (g + v) / 2.0 + Vector3.UP * 8.0
+		yaw_angle = atan2(g.x - global_position.x, g.z - global_position.z)
+	pitch_angle = 0.0
+	roll_value = 0.0
+	current_speed = max_speed * 0.6
+	weapon = ""
+	boost_timer = 0
+	star_timer = 0
+	slipstream_draft = 0
+	slipstream_boost = 0
+	trail.clear()
+	trick_roll = 0.0
+	trick_frame = 0
+	trick_timer = 0
 
 func _update_camera(delta):
 	if not camera:
 		return
-	# Camera follows behind and slightly above the plane
 	var cam_offset = transform.basis.z * 8.0 + Vector3.UP * 3.0
 	var target_pos = global_position + cam_offset
 	camera.global_position = camera.global_position.lerp(target_pos, delta * 5.0)
