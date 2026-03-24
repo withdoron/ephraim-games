@@ -155,9 +155,10 @@ func _physics_process(delta):
 
 	var tumble_mul = 0.2 if tumble_timer > 0 else 1.0
 	# Turn toward target — proportional steering
+	# Negate because rotate_y(positive) = turn LEFT in Godot, but positive yaw_diff = target is RIGHT
 	var turn_amount = clamp(yaw_diff * 2.0, -2.5, 2.5) * tumble_mul / 60.0
-	rotate_y(turn_amount)
-	roll_value = lerp(roll_value, -turn_amount * 15.0, 0.1)
+	rotate_y(-turn_amount)
+	roll_value = lerp(roll_value, turn_amount * 15.0, 0.1)  # Bank into the turn
 
 	# Pitch toward target altitude
 	var pitch_target = clamp(to_target.y / max(20.0, dH) * 0.8, -0.5, 0.5) * tumble_mul
@@ -182,8 +183,8 @@ func _physics_process(delta):
 	move_and_slide()
 
 	# Visual pitch and roll
-	rotation.x = -pitch_angle
-	rotation.z = roll_value
+	rotation.x = -pitch_angle  # Positive pitch = nose up = negative rotation.x
+	rotation.z = -roll_value  # Turning right = positive roll_value = tilt right = negative rotation.z
 
 	# NPC weapon use — ported from lines 995-997
 	if weapon != "" and randf() < 0.01:

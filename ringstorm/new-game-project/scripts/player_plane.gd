@@ -91,15 +91,15 @@ func _physics_process(delta):
 	var want_fire = false
 	var brake = false
 
-	# Keyboard
+	# Keyboard — A=left (positive rotate_y), D=right (negative rotate_y)
 	if Input.is_key_pressed(KEY_A):
-		turn_input += 1.0
+		turn_input -= 1.0  # Left = negative (will become positive rotate_y)
 	if Input.is_key_pressed(KEY_D):
-		turn_input -= 1.0
+		turn_input += 1.0  # Right = positive (will become negative rotate_y)
 	if Input.is_key_pressed(KEY_W):
-		pitch_input += 1.0
+		pitch_input += 1.0  # Up
 	if Input.is_key_pressed(KEY_S):
-		pitch_input -= 0.8  # Slightly weaker dive, matching browser -20*D vs 25*D
+		pitch_input -= 0.8  # Down
 	if Input.is_key_pressed(KEY_SPACE):
 		want_fire = true
 	if Input.is_key_pressed(KEY_SHIFT):
@@ -109,7 +109,7 @@ func _physics_process(delta):
 	var gp_x = Input.get_joy_axis(0, JOY_AXIS_LEFT_X)
 	var gp_y = Input.get_joy_axis(0, JOY_AXIS_LEFT_Y)
 	if abs(gp_x) > S.deadzone_x:
-		turn_input = -gp_x * S.stick_sensitivity
+		turn_input = gp_x * S.stick_sensitivity  # Positive X = right = positive turn_input
 	if abs(gp_y) > S.deadzone_y:
 		pitch_input = -gp_y * S.pitch_sensitivity
 		if S.invert_y_p1:
@@ -151,7 +151,7 @@ func _physics_process(delta):
 		pitch_target = 0.0  # Level out when no input
 	pitch_angle = lerp(pitch_angle, pitch_target, delta * 5.0)
 	pitch_angle = clamp(pitch_angle, deg_to_rad(-50), deg_to_rad(50))
-	# Roll: bank into turns
+	# Roll: bank into turns — turn right (positive) = roll right (negative rotation.z)
 	var roll_target = turn_input * deg_to_rad(35) * tumble_mul
 	roll_value = lerp(roll_value, roll_target, delta * 4.0)
 	if tumble_timer > 0:
@@ -195,8 +195,8 @@ func _physics_process(delta):
 	move_and_slide()
 
 	# Apply visual pitch and roll (yaw is handled by rotate_y above)
-	rotation.x = -pitch_angle  # Nose up/down
-	rotation.z = -(roll_value + trick_roll)  # Banking
+	rotation.x = -pitch_angle  # Positive pitch_angle = nose UP = negative rotation.x in Godot
+	rotation.z = -(roll_value + trick_roll)  # Turning right (+roll_value) = tilt right wing down (-rotation.z)
 
 	# --- FIRE WEAPON --- ported from lines 1057-1086
 	if fire_cooldown > 0:
