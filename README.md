@@ -22,8 +22,13 @@ cd grip && npm install && npm run dev
 cd ringstorm && npm install && npm run dev
 ```
 
+## Design Protocols
+
+See [GROWTH.md](GROWTH.md) for the design protocols that guide how Ringstorm Racers grows — adding courses, characters, weapons, and features. Every addition follows the fractal principle: circulation over extraction.
+
 ## Built With
 
 * React + Vite
 * Canvas 2D rendering
+* Godot 4.6 (Ringstorm Racers 3D port)
 * Designed by Ephraim, coded with AI assistance
