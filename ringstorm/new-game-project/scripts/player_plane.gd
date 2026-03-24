@@ -83,6 +83,7 @@ func _physics_process(delta):
 		return
 
 	var S = Settings
+	max_speed = S.player_speed  # Live update from settings
 
 	# --- INPUT --- ported from updatePlayer lines 1014-1035
 	var turn_input = 0.0

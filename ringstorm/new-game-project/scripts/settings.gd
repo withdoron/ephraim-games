@@ -26,6 +26,10 @@ var fire_cooldown: float = 15.0  # frames (at 60fps)
 var cube_respawn_race: float = 300.0
 var cube_respawn_battle: float = 180.0
 var crash_respawn_time: float = 80.0
+var gate_size: float = 15.0
+
+# Audio
+var master_volume: float = 1.0
 
 # Race
 var num_gates: int = 7

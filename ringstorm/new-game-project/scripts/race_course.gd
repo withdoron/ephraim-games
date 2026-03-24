@@ -3,7 +3,7 @@ extends Node3D
 # Gate positions, path ribbon, per-course height overrides
 
 @export var course_index: int = 0  # 0=Canyon, 1=Islands, 2=Mountain, 3=Ocean, 4=Volcano, 5=Ice, 6=Space
-@export var gate_size: float = 15.0
+var gate_size: float = 15.0
 
 var gates: Array = []  # Array of Vector3 gate positions
 var gate_meshes: Array = []
@@ -11,6 +11,7 @@ var num_gates: int = 7
 
 func _ready():
 	num_gates = Settings.num_gates
+	gate_size = Settings.gate_size
 	generate_course()
 	create_gate_visuals()
 	create_path_ribbon()

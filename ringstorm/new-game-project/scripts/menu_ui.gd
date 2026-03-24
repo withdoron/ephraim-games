@@ -51,6 +51,7 @@ func _show_main_menu():
 	_add_btn(vbox, "BATTLE", Color(0.94, 0.27, 0.27), func(): _show_player_select("battle"))
 	_add_spacer(vbox, 10)
 	_add_btn(vbox, "CONTROLS", Color(0.58, 0.64, 0.72), func(): _show_controls(), true)
+	_add_btn(vbox, "SETTINGS", Color(0.58, 0.64, 0.72), func(): _show_settings(), true)
 
 func _show_player_select(mode: String):
 	_clear()
@@ -144,6 +145,123 @@ func show_menu():
 	visible = true
 	bg.color.a = 1.0
 	_show_main_menu()
+
+# --- Settings screen ---
+
+func _show_settings():
+	_clear()
+	current_screen = "settings"
+	# Use a ScrollContainer so sliders don't overflow
+	var scroll = ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.offset_left = 40; scroll.offset_right = -40
+	scroll.offset_top = 20; scroll.offset_bottom = -20
+	container.add_child(scroll)
+	var vbox = VBoxContainer.new()
+	vbox.custom_minimum_size = Vector2(400, 0)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_theme_constant_override("separation", 4)
+	scroll.add_child(vbox)
+
+	_add_title(vbox, "⚙️ SETTINGS", 28, Color(0.58, 0.64, 0.72))
+	_add_title(vbox, "Changes apply instantly", 11, Color(0.4, 0.45, 0.5))
+	_add_spacer(vbox, 8)
+
+	_add_section_header(vbox, "SPEED")
+	_add_slider(vbox, "Player Speed", Settings.player_speed, 2.0, 15.0, 0.5, func(v): Settings.player_speed = v)
+	_add_slider(vbox, "NPC Speed", Settings.npc_speed, 2.0, 15.0, 0.5, func(v): Settings.npc_speed = v)
+	_add_slider(vbox, "Boost Power", Settings.boost_multiplier, 1.1, 2.5, 0.1, func(v): Settings.boost_multiplier = v)
+	_add_slider(vbox, "Star Power", Settings.star_multiplier, 1.1, 2.5, 0.1, func(v): Settings.star_multiplier = v)
+	_add_slider(vbox, "Start Speed", Settings.start_speed, 0.0, 5.0, 0.5, func(v): Settings.start_speed = v)
+	_add_slider(vbox, "Brake Strength", Settings.brake_strength, 0.1, 0.9, 0.05, func(v): Settings.brake_strength = v)
+
+	_add_section_header(vbox, "CONTROLLER")
+	_add_slider(vbox, "Deadzone X", Settings.deadzone_x, 0.05, 0.6, 0.05, func(v): Settings.deadzone_x = v)
+	_add_slider(vbox, "Deadzone Y", Settings.deadzone_y, 0.05, 0.6, 0.05, func(v): Settings.deadzone_y = v)
+	_add_slider(vbox, "Turn Sensitivity", Settings.stick_sensitivity, 0.3, 2.0, 0.1, func(v): Settings.stick_sensitivity = v)
+	_add_slider(vbox, "Pitch Sensitivity", Settings.pitch_sensitivity, 0.3, 2.0, 0.1, func(v): Settings.pitch_sensitivity = v)
+	_add_toggle(vbox, "Invert Y (P1)", Settings.invert_y_p1, func(v): Settings.invert_y_p1 = v)
+	_add_toggle(vbox, "Invert Y (P2)", Settings.invert_y_p2, func(v): Settings.invert_y_p2 = v)
+
+	_add_section_header(vbox, "GAMEPLAY")
+	_add_slider(vbox, "Turn Rate", Settings.turn_rate, 20.0, 80.0, 5.0, func(v): Settings.turn_rate = v)
+	_add_slider(vbox, "Pitch Rate", Settings.pitch_rate, 10.0, 40.0, 5.0, func(v): Settings.pitch_rate = v)
+	_add_slider(vbox, "Fire Cooldown", Settings.fire_cooldown, 5.0, 30.0, 1.0, func(v): Settings.fire_cooldown = v)
+	_add_slider(vbox, "Gate Size", Settings.gate_size, 8.0, 30.0, 1.0, func(v): Settings.gate_size = v)
+	_add_slider(vbox, "Crash Respawn", Settings.crash_respawn_time, 30.0, 150.0, 10.0, func(v): Settings.crash_respawn_time = v)
+
+	_add_section_header(vbox, "AUDIO")
+	_add_slider(vbox, "Volume", Settings.master_volume, 0.0, 1.0, 0.05, func(v):
+		Settings.master_volume = v
+		AudioServer.set_bus_volume_db(0, linear_to_db(max(v, 0.001)))
+	)
+
+	_add_spacer(vbox, 10)
+	_add_btn(vbox, "RESET TO DEFAULT", Color(0.6, 0.6, 0.6), func(): _reset_settings(), true)
+	_add_btn(vbox, "BACK", Color(0.5, 0.55, 0.65), func(): _show_main_menu(), true)
+
+func _add_section_header(parent: Control, text: String):
+	var label = Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color(0.5, 0.6, 0.8))
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	parent.add_child(label)
+
+func _add_slider(parent: Control, label_text: String, current_value: float, min_val: float, max_val: float, step_val: float, on_change: Callable):
+	var row = HBoxContainer.new()
+	row.custom_minimum_size = Vector2(0, 28)
+	var label = Label.new()
+	label.text = label_text
+	label.custom_minimum_size = Vector2(140, 0)
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color(0.7, 0.75, 0.8))
+	row.add_child(label)
+	var slider = HSlider.new()
+	slider.min_value = min_val; slider.max_value = max_val; slider.step = step_val
+	slider.value = current_value
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.custom_minimum_size = Vector2(140, 0)
+	row.add_child(slider)
+	var val_label = Label.new()
+	val_label.text = str(snapped(current_value, step_val))
+	val_label.custom_minimum_size = Vector2(45, 0)
+	val_label.add_theme_font_size_override("font_size", 12)
+	val_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.15))
+	row.add_child(val_label)
+	slider.value_changed.connect(func(v):
+		on_change.call(v)
+		val_label.text = str(snapped(v, step_val))
+	)
+	parent.add_child(row)
+
+func _add_toggle(parent: Control, label_text: String, current_value: bool, on_change: Callable):
+	var row = HBoxContainer.new()
+	row.custom_minimum_size = Vector2(0, 28)
+	var label = Label.new()
+	label.text = label_text
+	label.custom_minimum_size = Vector2(140, 0)
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color(0.7, 0.75, 0.8))
+	row.add_child(label)
+	var toggle = CheckButton.new()
+	toggle.button_pressed = current_value
+	toggle.toggled.connect(func(v): on_change.call(v))
+	row.add_child(toggle)
+	parent.add_child(row)
+
+func _reset_settings():
+	Settings.player_speed = 6.0; Settings.npc_speed = 5.5
+	Settings.boost_multiplier = 1.5; Settings.star_multiplier = 1.4
+	Settings.start_speed = 1.0; Settings.brake_strength = 0.5
+	Settings.deadzone_x = 0.3; Settings.deadzone_y = 0.4
+	Settings.stick_sensitivity = 1.0; Settings.pitch_sensitivity = 1.0
+	Settings.invert_y_p1 = false; Settings.invert_y_p2 = false
+	Settings.turn_rate = 50.0; Settings.pitch_rate = 25.0
+	Settings.fire_cooldown = 15.0; Settings.gate_size = 15.0
+	Settings.crash_respawn_time = 80.0; Settings.master_volume = 1.0
+	AudioServer.set_bus_volume_db(0, 0.0)
+	_show_settings()
 
 # --- UI helpers ---
 

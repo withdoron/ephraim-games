@@ -99,6 +99,7 @@ func on_race_start():
 
 # Ported from Ringstorm.jsx updateNPC() lines 917-998
 func _physics_process(delta):
+	max_speed = Settings.npc_speed + (skill_level - 0.7) * 3.0  # Live update from settings
 	if race_finished:
 		return
 	if is_crashed:
