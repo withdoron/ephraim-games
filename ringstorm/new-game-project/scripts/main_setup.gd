@@ -3,9 +3,11 @@ extends Node3D
 # Ported from Ringstorm.jsx main useEffect
 
 var player_plane: CharacterBody3D
+var player2_plane: CharacterBody3D
 var npc_planes: Array = []
 var race_mgr: Node
 var hud_node: CanvasLayer
+var hud2_node: CanvasLayer
 var course: Node3D
 var menu: CanvasLayer
 var weapon_sys: Node3D
@@ -13,6 +15,8 @@ var cube_sys: Node3D
 var game_nodes: Array = []
 var paused: bool = false
 var current_course_idx: int = 0
+var num_players: int = 1
+var split_container: Control = null
 
 func _ready():
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
@@ -26,14 +30,16 @@ func _ready():
 	menu.restart_game.connect(_on_restart)
 	menu.quit_to_menu.connect(_on_quit_to_menu)
 
-func _on_start_race(num_players: int, course_idx: int):
+func _on_start_race(np: int, course_idx: int):
+	num_players = np
 	current_course_idx = course_idx
 	menu.hide_menu()
-	_create_game(num_players, course_idx, false)
+	_create_game(np, course_idx, false)
 
-func _on_start_battle(num_players: int):
+func _on_start_battle(np: int):
+	num_players = np
 	menu.hide_menu()
-	_create_game(num_players, 0, true)
+	_create_game(np, 0, true)
 
 func _on_resume():
 	paused = false
@@ -60,18 +66,26 @@ func _cleanup_game():
 	game_nodes.clear()
 	npc_planes.clear()
 	player_plane = null
+	player2_plane = null
 	race_mgr = null
 	hud_node = null
+	hud2_node = null
 	course = null
 	weapon_sys = null
 	cube_sys = null
+	if split_container and is_instance_valid(split_container):
+		split_container.queue_free()
+		split_container = null
 
-func _create_game(num_players: int, course_idx: int, is_battle: bool):
+func _create_game(np: int, course_idx: int, is_battle: bool):
 	_create_environment(course_idx)
 	_create_course(course_idx)
 	_create_weapon_system()
 	_create_cube_system(is_battle)
 	_create_hud()
+	if np == 2:
+		_create_hud2()
+		_create_split_screen()
 	_create_race_manager(is_battle)
 	_create_racers(is_battle)
 	call_deferred("_setup_race", is_battle)
@@ -177,6 +191,53 @@ func _create_hud():
 	hud_node.set_script(load("res://scripts/hud.gd"))
 	add_child(hud_node); game_nodes.append(hud_node)
 
+func _create_hud2():
+	hud2_node = CanvasLayer.new()
+	hud2_node.name = "HUD2"
+	hud2_node.set_script(load("res://scripts/hud.gd"))
+	hud2_node.layer = 2
+	add_child(hud2_node); game_nodes.append(hud2_node)
+
+func _create_split_screen():
+	# Create split screen with two SubViewportContainers
+	split_container = Control.new()
+	split_container.name = "SplitScreen"
+	split_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var vbox = VBoxContainer.new()
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vbox.add_theme_constant_override("separation", 2)
+	split_container.add_child(vbox)
+
+	# Top half — P1
+	var vc1 = SubViewportContainer.new()
+	vc1.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vc1.stretch = true
+	vbox.add_child(vc1)
+	var vp1 = SubViewport.new()
+	vp1.name = "VP1"
+	vp1.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	vp1.handle_input_locally = false
+	vc1.add_child(vp1)
+
+	# Divider
+	var div = ColorRect.new()
+	div.custom_minimum_size = Vector2(0, 2)
+	div.color = Color(0, 0, 0)
+	vbox.add_child(div)
+
+	# Bottom half — P2
+	var vc2 = SubViewportContainer.new()
+	vc2.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vc2.stretch = true
+	vbox.add_child(vc2)
+	var vp2 = SubViewport.new()
+	vp2.name = "VP2"
+	vp2.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	vp2.handle_input_locally = false
+	vc2.add_child(vp2)
+
+	add_child(split_container); game_nodes.append(split_container)
+
 func _create_race_manager(is_battle: bool):
 	race_mgr = Node.new()
 	race_mgr.name = "RaceManager"
@@ -193,10 +254,23 @@ func _create_race_manager(is_battle: bool):
 
 func _create_racers(is_battle: bool):
 	var all_racers: Array = []
+	# Player 1
 	player_plane = _create_player_plane(Settings.racer_data[0])
+	player_plane.player_id = 1
 	add_child(player_plane); game_nodes.append(player_plane)
 	all_racers.append(player_plane)
 	race_mgr.register_racer(player_plane)
+	# Player 2 (if 2P mode)
+	if num_players == 2:
+		player2_plane = _create_player_plane(Settings.racer_data[1])
+		player2_plane.player_id = 2
+		# Disable P2's camera in the main scene — it will be in the viewport
+		var p2cam = player2_plane.get_node_or_null("Camera3D")
+		if p2cam: p2cam.current = false
+		add_child(player2_plane); game_nodes.append(player2_plane)
+		all_racers.append(player2_plane)
+		race_mgr.register_racer(player2_plane)
+	# NPCs
 	for i in range(2, 5):
 		var data = Settings.racer_data[i]
 		var npc = _create_npc(data)
@@ -369,6 +443,11 @@ func _setup_race(is_battle: bool):
 	player_plane.race_manager = race_mgr
 	player_plane.hud = hud_node
 	player_plane.weapon_system = weapon_sys
+	if player2_plane:
+		player2_plane.race_course = course
+		player2_plane.race_manager = race_mgr
+		player2_plane.hud = hud2_node
+		player2_plane.weapon_system = weapon_sys
 	for npc in npc_planes:
 		npc.race_course = course
 		npc.race_manager = race_mgr
@@ -422,11 +501,14 @@ func _on_lap_completed(racer: Node, lap: int):
 
 func _on_race_finished(racer: Node, position: int):
 	if not racer.is_npc:
-		# Player finished — show their position
-		hud_node.show_player_finished(position)
+		# Determine which player's HUD to update
+		var hud_target = hud_node
+		if racer == player2_plane and hud2_node:
+			hud_target = hud2_node
+		hud_target.show_player_finished(position)
 		var pos_names = ["", "1ST PLACE!", "2ND PLACE!", "3RD PLACE!", "4TH PLACE!", "5TH PLACE!"]
 		var pos_text = pos_names[position] if position < pos_names.size() else str(position) + "TH PLACE!"
-		hud_node.show_announcement(pos_text, Color(0.98, 0.75, 0.14) if position == 1 else Color(0.75, 0.75, 0.8))
+		hud_target.show_announcement(pos_text, Color(0.98, 0.75, 0.14) if position == 1 else Color(0.75, 0.75, 0.8))
 		if position == 1:
 			AudioManager.play("victory")
 		else:

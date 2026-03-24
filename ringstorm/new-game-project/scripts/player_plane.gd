@@ -20,6 +20,7 @@ var finish_time: int = 0
 var finish_position: int = 0
 var is_npc: bool = false
 var autopilot_gate: int = 0
+@export var player_id: int = 1  # 1 = WASD + gamepad 0, 2 = arrows + gamepad 1
 
 # Status effects
 var boost_timer: int = 0
@@ -104,39 +105,42 @@ func _physics_process(delta):
 	var S = Settings
 	max_speed = S.player_speed  # Live update from settings
 
-	# --- INPUT --- ported from updatePlayer lines 1014-1035
+	# --- INPUT --- player_id selects control scheme
 	var turn_input = 0.0
 	var pitch_input = 0.0
 	var want_fire = false
 	var brake = false
+	var gp_dev = player_id - 1  # P1 = gamepad 0, P2 = gamepad 1
 
-	# Keyboard — A=left (positive rotate_y), D=right (negative rotate_y)
-	if Input.is_key_pressed(KEY_A):
-		turn_input -= 1.0  # Left = negative (will become positive rotate_y)
-	if Input.is_key_pressed(KEY_D):
-		turn_input += 1.0  # Right = positive (will become negative rotate_y)
-	if Input.is_key_pressed(KEY_W):
-		pitch_input += 1.0  # Up
-	if Input.is_key_pressed(KEY_S):
-		pitch_input -= 0.8  # Down
-	if Input.is_key_pressed(KEY_SPACE):
-		want_fire = true
-	if Input.is_key_pressed(KEY_SHIFT):
-		brake = true
+	# Keyboard — different keys per player
+	if player_id == 1:
+		if Input.is_key_pressed(KEY_A): turn_input -= 1.0
+		if Input.is_key_pressed(KEY_D): turn_input += 1.0
+		if Input.is_key_pressed(KEY_W): pitch_input += 1.0
+		if Input.is_key_pressed(KEY_S): pitch_input -= 0.8
+		if Input.is_key_pressed(KEY_SPACE): want_fire = true
+		if Input.is_key_pressed(KEY_SHIFT): brake = true
+	else:
+		if Input.is_key_pressed(KEY_LEFT): turn_input -= 1.0
+		if Input.is_key_pressed(KEY_RIGHT): turn_input += 1.0
+		if Input.is_key_pressed(KEY_UP): pitch_input += 1.0
+		if Input.is_key_pressed(KEY_DOWN): pitch_input -= 0.8
+		if Input.is_key_pressed(KEY_SLASH): want_fire = true
+		if Input.is_key_pressed(KEY_PERIOD): brake = true
 
 	# Gamepad — separate from keyboard (no injection)
-	var gp_x = Input.get_joy_axis(0, JOY_AXIS_LEFT_X)
-	var gp_y = Input.get_joy_axis(0, JOY_AXIS_LEFT_Y)
+	var gp_x = Input.get_joy_axis(gp_dev, JOY_AXIS_LEFT_X)
+	var gp_y = Input.get_joy_axis(gp_dev, JOY_AXIS_LEFT_Y)
 	if abs(gp_x) > S.deadzone_x:
-		turn_input = gp_x * S.stick_sensitivity  # Positive X = right = positive turn_input
+		turn_input = gp_x * S.stick_sensitivity
 	if abs(gp_y) > S.deadzone_y:
 		pitch_input = -gp_y * S.pitch_sensitivity
-		if S.invert_y_p1:
-			pitch_input = -pitch_input
-	if Input.is_joy_button_pressed(0, JOY_BUTTON_A):
+		var invert = S.invert_y_p1 if player_id == 1 else S.invert_y_p2
+		if invert: pitch_input = -pitch_input
+	if Input.is_joy_button_pressed(gp_dev, JOY_BUTTON_A):
 		want_fire = true
-	var gp_lt = Input.get_joy_axis(0, JOY_AXIS_TRIGGER_LEFT)
-	if gp_lt > 0.3 or Input.is_joy_button_pressed(0, JOY_BUTTON_LEFT_SHOULDER):
+	var gp_lt = Input.get_joy_axis(gp_dev, JOY_AXIS_TRIGGER_LEFT)
+	if gp_lt > 0.3 or Input.is_joy_button_pressed(gp_dev, JOY_BUTTON_LEFT_SHOULDER):
 		brake = true
 
 	# --- SPEED --- ported from lines 1014-1019
@@ -192,12 +196,12 @@ func _physics_process(delta):
 	_prev_left = Input.is_key_pressed(KEY_A)
 	_prev_right = Input.is_key_pressed(KEY_D)
 	# Gamepad barrel roll (B = right, X = left)
-	if Input.is_joy_button_pressed(0, JOY_BUTTON_B) and not _prev_gp_roll_r and trick_timer <= 0 and trick_frame <= 0:
+	if Input.is_joy_button_pressed(gp_dev, JOY_BUTTON_B) and not _prev_gp_roll_r and trick_timer <= 0 and trick_frame <= 0:
 		trick_frame = 30; trick_dir = -1; trick_roll = 0.0
-	if Input.is_joy_button_pressed(0, JOY_BUTTON_X) and not _prev_gp_roll_l and trick_timer <= 0 and trick_frame <= 0:
+	if Input.is_joy_button_pressed(gp_dev, JOY_BUTTON_X) and not _prev_gp_roll_l and trick_timer <= 0 and trick_frame <= 0:
 		trick_frame = 30; trick_dir = 1; trick_roll = 0.0
-	_prev_gp_roll_r = Input.is_joy_button_pressed(0, JOY_BUTTON_B)
-	_prev_gp_roll_l = Input.is_joy_button_pressed(0, JOY_BUTTON_X)
+	_prev_gp_roll_r = Input.is_joy_button_pressed(gp_dev, JOY_BUTTON_B)
+	_prev_gp_roll_l = Input.is_joy_button_pressed(gp_dev, JOY_BUTTON_X)
 	if trick_frame > 0:
 		trick_roll += (PI * 2.0 / 30.0) * trick_dir
 		trick_frame -= 1

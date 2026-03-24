@@ -61,6 +61,16 @@ func _spawn_cube(pos: Vector3, gives: String, no_respawn: bool):
 	mat.emission_energy_multiplier = 1.5
 	mesh.material_override = mat
 	mesh.global_position = pos
+	# "?" label — always faces camera
+	var label = Label3D.new()
+	label.text = "?"
+	label.font_size = 72
+	label.modulate = Color(1.0, 1.0, 1.0)
+	label.outline_modulate = Color(0.3, 0.2, 0.0)
+	label.outline_size = 8
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	mesh.add_child(label)
 	add_child(mesh)
 	cubes.append({
 		"node": mesh, "active": true, "respawn_timer": 0,
