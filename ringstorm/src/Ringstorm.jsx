@@ -797,13 +797,18 @@ export default function Game() {
     const W_FIRST = [{id:"gun",weight:40},{id:"boost",weight:40},{id:"missile",weight:15},{id:"star",weight:3},{id:"flares",weight:2}];
     const W_MID   = [{id:"gun",weight:20},{id:"boost",weight:24},{id:"missile",weight:30},{id:"star",weight:11},{id:"flares",weight:15}];
     const W_LAST  = [{id:"gun",weight:5},{id:"boost",weight:15},{id:"missile",weight:29},{id:"star",weight:35},{id:"flares",weight:16}];
+    // Battle mode — more aggressive weapons
+    const WB_FIRST = [{id:"gun",weight:30},{id:"boost",weight:20},{id:"missile",weight:30},{id:"star",weight:10},{id:"flares",weight:10}];
+    const WB_MID   = [{id:"gun",weight:15},{id:"boost",weight:15},{id:"missile",weight:30},{id:"star",weight:25},{id:"flares",weight:15}];
+    const WB_LAST  = [{id:"gun",weight:5},{id:"boost",weight:10},{id:"missile",weight:25},{id:"star",weight:45},{id:"flares",weight:15}];
 
     function getItemForPos(racer) {
       const pos = getRacePos(racer);
       const total = rs.filter(r2 => !r2.fn).length + fo.length;
       let tier;
-      if (total <= 2) { tier = pos === 1 ? W_FIRST : W_LAST; }
-      else { const lastStart = Math.max(2, total - 1); tier = pos <= 1 ? W_FIRST : pos >= lastStart ? W_LAST : W_MID; }
+      const [TF, TM, TL] = iB ? [WB_FIRST, WB_MID, WB_LAST] : [W_FIRST, W_MID, W_LAST];
+      if (total <= 2) { tier = pos === 1 ? TF : TL; }
+      else { const lastStart = Math.max(2, total - 1); tier = pos <= 1 ? TF : pos >= lastStart ? TL : TM; }
       return weightedRandom(tier);
     }
 
@@ -811,7 +816,7 @@ export default function Game() {
       cubes.forEach(c => {
         if (!c.active) return;
         if (Math.sqrt((r.x - c.x) ** 2 + (r.y - c.y) ** 2 + (r.z - c.z) ** 2) < 20) {
-          c.active = false; c.rt = 300;
+          c.active = false; c.rt = iB ? 180 : 300;
           if (r.wp === null) {
             const id = getItemForPos(r);
             r.wp = id; r.wt = id === "gun" ? 8 : 0;
@@ -975,7 +980,7 @@ export default function Game() {
       // NPC weapon use
       if (r.wp && Math.random() < (iB ? 0.02 : 0.01)) {
         if (r.wp === "boost") { r.bt = 120; r.wp = null; }
-        else if (r.wp === "star") { r.st = 180; r.wp = null; }
+        else if (r.wp === "star") { r.st = iB ? 240 : 180; r.wp = null; }
         else if (r.wp === "missile") {
           const tg = rs.filter(t => t !== r && !t.cr && !t.fn);
           if (tg.length) pj.push({ x: r.x, y: r.y, z: r.z, vx: sy * 12, vy: 0, vz: cy * 12, l: 180, s: 4, cl: "#ef4444", o: r, hm: 1, tg: tg[Math.floor(Math.random() * tg.length)] });
@@ -1049,10 +1054,11 @@ export default function Game() {
       const { sy, sp2, cy } = moveRacer(r, dt);
       checkSlipstream(r);
 
-      // Fire weapon
-      if (ks[fK] && r.wp && !ks["_" + fK]) {
-        ks["_" + fK] = 1;
-        setTimeout(() => { ks["_" + fK] = 0; }, 200);
+      // Fire weapon — rising edge only (fire on press, not hold)
+      const fireNow = ks[fK];
+      const firePrev = ks["_fp_" + fK] || false;
+      ks["_fp_" + fK] = fireNow;
+      if (fireNow && !firePrev && r.wp) {
         if (r.wp === "gun") {
           for (let i = -1; i <= 1; i += 2) pj.push({ x: r.x + i * 3, y: r.y, z: r.z, vx: sy * 20, vy: sp2 * 20, vz: cy * 20, l: 60, s: 2, cl: "#fbbf24", o: r, hm: 0 });
           r.wt--; if (r.wt <= 0) r.wp = null;
@@ -1062,7 +1068,7 @@ export default function Game() {
           pj.push({ x: r.x, y: r.y, z: r.z, vx: sy * 12, vy: sp2 * 12, vz: cy * 12, l: 180, s: 4, cl: "#ef4444", o: r, hm: 1, tg: tg });
           r.wp = null; addAnnouncement("MISSILE AWAY!", "#ef4444");
         } else if (r.wp === "boost") { r.bt = 120; r.wp = null; }
-        else if (r.wp === "star") { r.st = 180; r.wp = null; addAnnouncement("STAR POWER!", "#fbbf24"); }
+        else if (r.wp === "star") { r.st = iB ? 240 : 180; r.wp = null; addAnnouncement("STAR POWER!", "#fbbf24"); }
         else if (r.wp === "flares") {
           for (let i = 0; i < 6; i++) pj.push({ x: r.x, y: r.y, z: r.z, vx: (Math.random() - 0.5) * 12, vy: -Math.random() * 5 - 2, vz: (Math.random() - 0.5) * 12, l: 50, s: 3, cl: "#fff", o: r, hm: 0, fl: 1 });
           r.hf = 1; setTimeout(() => { r.hf = 0; }, 2000);
@@ -2278,6 +2284,20 @@ export default function Game() {
       if (victoryTarget && victoryFrame < 120) { victoryTarget.rl = Math.sin(fc * 0.15) * 30 * D; victoryFrame++; }
       // Race start announcement
       if (!iB && started && fc === 241) addAnnouncement("GO GO GO!", "#22c55e");
+
+      // Star ram — star-powered racers crash others on contact
+      rs.forEach(r => {
+        if (r.st <= 0 || r.cr || r.fn) return;
+        rs.forEach(o => {
+          if (o === r || o.cr || o.fn || o.st > 0) return;
+          const d = Math.sqrt((r.x - o.x) ** 2 + (r.y - o.y) ** 2 + (r.z - o.z) ** 2);
+          if (d < 30) {
+            boom(o);
+            if (iB) r.kl++;
+            if (!r.npc) addAnnouncement("STAR RAM!", "#fbbf24");
+          }
+        });
+      });
 
       // Homing missiles
       pj.forEach(pr => {
