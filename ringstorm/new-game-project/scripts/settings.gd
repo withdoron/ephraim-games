@@ -2,6 +2,11 @@ extends Node
 # Autoload singleton — all tunable game parameters
 # Ported from Ringstorm.jsx settings panel
 
+const SAVE_PATH = "user://settings.cfg"
+
+func _ready():
+	load_settings()
+
 # Speed — tuned for Godot 3D (browser speed was ~6 but different unit scale)
 var player_speed: float = 30.0
 var npc_speed: float = 25.0
@@ -66,3 +71,49 @@ func get_y_var(course_idx: int) -> float:
 		3: return 4.0    # Ocean (15/4)
 		6: return 20.0   # Space (80/4)
 		_: return 7.5    # Default (30/4)
+
+func save_settings():
+	var c = ConfigFile.new()
+	c.set_value("speed", "player_speed", player_speed)
+	c.set_value("speed", "npc_speed", npc_speed)
+	c.set_value("speed", "boost_multiplier", boost_multiplier)
+	c.set_value("speed", "star_multiplier", star_multiplier)
+	c.set_value("speed", "start_speed", start_speed)
+	c.set_value("speed", "brake_strength", brake_strength)
+	c.set_value("speed", "min_brake_speed", min_brake_speed)
+	c.set_value("controller", "deadzone_x", deadzone_x)
+	c.set_value("controller", "deadzone_y", deadzone_y)
+	c.set_value("controller", "stick_sensitivity", stick_sensitivity)
+	c.set_value("controller", "pitch_sensitivity", pitch_sensitivity)
+	c.set_value("controller", "invert_y_p1", invert_y_p1)
+	c.set_value("controller", "invert_y_p2", invert_y_p2)
+	c.set_value("gameplay", "turn_rate", turn_rate)
+	c.set_value("gameplay", "pitch_rate", pitch_rate)
+	c.set_value("gameplay", "fire_cooldown", fire_cooldown)
+	c.set_value("gameplay", "gate_size", gate_size)
+	c.set_value("audio", "master_volume", master_volume)
+	c.save(SAVE_PATH)
+
+func load_settings():
+	var c = ConfigFile.new()
+	if c.load(SAVE_PATH) != OK:
+		return  # No save file yet, use defaults
+	player_speed = c.get_value("speed", "player_speed", player_speed)
+	npc_speed = c.get_value("speed", "npc_speed", npc_speed)
+	boost_multiplier = c.get_value("speed", "boost_multiplier", boost_multiplier)
+	star_multiplier = c.get_value("speed", "star_multiplier", star_multiplier)
+	start_speed = c.get_value("speed", "start_speed", start_speed)
+	brake_strength = c.get_value("speed", "brake_strength", brake_strength)
+	min_brake_speed = c.get_value("speed", "min_brake_speed", min_brake_speed)
+	deadzone_x = c.get_value("controller", "deadzone_x", deadzone_x)
+	deadzone_y = c.get_value("controller", "deadzone_y", deadzone_y)
+	stick_sensitivity = c.get_value("controller", "stick_sensitivity", stick_sensitivity)
+	pitch_sensitivity = c.get_value("controller", "pitch_sensitivity", pitch_sensitivity)
+	invert_y_p1 = c.get_value("controller", "invert_y_p1", invert_y_p1)
+	invert_y_p2 = c.get_value("controller", "invert_y_p2", invert_y_p2)
+	turn_rate = c.get_value("gameplay", "turn_rate", turn_rate)
+	pitch_rate = c.get_value("gameplay", "pitch_rate", pitch_rate)
+	fire_cooldown = c.get_value("gameplay", "fire_cooldown", fire_cooldown)
+	gate_size = c.get_value("gameplay", "gate_size", gate_size)
+	master_volume = c.get_value("audio", "master_volume", master_volume)
+	AudioServer.set_bus_volume_db(0, linear_to_db(master_volume))

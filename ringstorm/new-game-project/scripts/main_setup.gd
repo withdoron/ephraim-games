@@ -19,6 +19,7 @@ var num_players: int = 1
 var split_container: Control = null
 
 func _ready():
+	process_mode = Node.PROCESS_MODE_ALWAYS  # Must process while paused to handle unpause
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
 	menu = CanvasLayer.new()
 	menu.name = "Menu"

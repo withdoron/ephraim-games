@@ -26,6 +26,7 @@ const COURSES = [
 
 func _ready():
 	layer = 10  # Above game
+	process_mode = Node.PROCESS_MODE_ALWAYS  # Must process while tree is paused
 	bg = ColorRect.new()
 	bg.color = Color(0.04, 0.06, 0.1, 1.0)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -232,6 +233,7 @@ func _add_slider(parent: Control, label_text: String, current_value: float, min_
 	slider.value_changed.connect(func(v):
 		on_change.call(v)
 		val_label.text = str(snapped(v, step_val))
+		Settings.save_settings()
 	)
 	parent.add_child(row)
 
@@ -246,7 +248,7 @@ func _add_toggle(parent: Control, label_text: String, current_value: bool, on_ch
 	row.add_child(label)
 	var toggle = CheckButton.new()
 	toggle.button_pressed = current_value
-	toggle.toggled.connect(func(v): on_change.call(v))
+	toggle.toggled.connect(func(v): on_change.call(v); Settings.save_settings())
 	row.add_child(toggle)
 	parent.add_child(row)
 
@@ -261,6 +263,7 @@ func _reset_settings():
 	Settings.fire_cooldown = 15.0; Settings.gate_size = 15.0
 	Settings.crash_respawn_time = 80.0; Settings.master_volume = 1.0
 	AudioServer.set_bus_volume_db(0, 0.0)
+	Settings.save_settings()
 	_show_settings()
 
 # --- UI helpers ---
