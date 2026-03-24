@@ -721,8 +721,37 @@ export default function Game() {
           }
         }
         // Passed through successfully
+        if (!r.npc && r.trickRoll !== 0) { r.bt = 60; addAnnouncement("TRICK BOOST!", "#06b6d4"); }
         r.ng++;
-        if (r.ng >= NG) { r.ng = 0; r.lp++; r.scUsed = new Set(); if (r.lp >= LAPS) { r.fn = 1; r.ft = rt; fo.push(r); r.fp = fo.length; } }
+        if (!r.npc) addAnnouncement("GATE " + r.ng + "!", "#fbbf24");
+        if (r.ng >= NG) {
+          r.ng = 0; r.lp++; r.scUsed = new Set();
+          if (!r.npc) {
+            if (r.lp === 1) addAnnouncement("LAP 2!", "#eab308");
+            else if (r.lp === LAPS - 1) addAnnouncement("FINAL LAP!", "#ef4444");
+          }
+          if (r.lp >= LAPS) {
+            r.fn = 1; r.ft = rt; fo.push(r); r.fp = fo.length;
+            if (!r.npc && r.fp === 1) {
+              addAnnouncement("1ST PLACE!", "#fbbf24");
+              victoryTarget = r; victoryFrame = 0;
+              // Spawn fireworks near finish gate
+              const fg = crs[0];
+              for (let b = 0; b < 5; b++) {
+                setTimeout(() => {
+                  const bx = fg.x + (Math.random() - 0.5) * 200, bz = fg.z + (Math.random() - 0.5) * 200, by2 = fg.y + 50 + Math.random() * 100;
+                  const colors = ["#ef4444","#fbbf24","#3b82f6","#22c55e","#ffffff","#a855f7"];
+                  for (let p2 = 0; p2 < 18; p2++) {
+                    const spd = 3 + Math.random() * 5;
+                    const ax = (Math.random() - 0.5) * 2, ay = (Math.random() - 0.5) * 2, az = (Math.random() - 0.5) * 2;
+                    const mag = Math.sqrt(ax * ax + ay * ay + az * az) || 1;
+                    fireworks.push({ x: bx, y: by2, z: bz, vx: ax / mag * spd, vy: ay / mag * spd, vz: az / mag * spd, color: colors[Math.floor(Math.random() * colors.length)], size: 3 + Math.random() * 3, life: 60 + Math.random() * 30, maxLife: 90 });
+                  }
+                }, b * 300);
+              }
+            }
+          }
+        }
       }
     }
 
