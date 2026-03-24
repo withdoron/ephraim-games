@@ -236,6 +236,11 @@ func _physics_process(delta):
 		if trail.size() > 30:
 			trail.pop_front()
 
+	# Spin propeller
+	var prop = get_node_or_null("Propeller")
+	if prop:
+		prop.rotation.z += 25.0 * delta
+
 	# Camera
 	_update_camera(delta)
 
