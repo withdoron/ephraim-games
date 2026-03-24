@@ -32,6 +32,10 @@ export default function Game() {
   const gpMapRef = useRef(gpMap), gpMap2Ref = useRef(gpMap2);
   gpMapRef.current = gpMap; gpMap2Ref.current = gpMap2;
   const [remapping, setRemapping] = useState(null); // { player: 1|2, action: string } or null
+  const [invY1, setInvY1] = useState(false);
+  const [invY2, setInvY2] = useState(false);
+  const invY1Ref = useRef(false), invY2Ref = useRef(false);
+  invY1Ref.current = invY1; invY2Ref.current = invY2;
   const pauseRef = useRef(false);
   pauseRef.current = paused;
 
@@ -70,10 +74,22 @@ export default function Game() {
       if (ly > 0.5) { setMenuSel(s => s + 1); cd = 3; }
       if (aBtn) {
         cd = 5;
-        if (sc === "menu") { const acts = [() => { setGm("race"); setSc("pick"); }, () => { setGm("battle"); setSc("pick"); }, () => setSc("ctrl")]; setMenuSel(s => { if (acts[s]) acts[s](); return s; }); }
+        if (sc === "menu") { const acts = [() => { setGm("race"); setSc("pick"); }, () => { setGm("battle"); setSc("pick"); }, () => setSc("ctrl"), () => setSc("customize")]; setMenuSel(s => { if (acts[s]) acts[s](); return s; }); }
         else if (sc === "pick") { setMenuSel(s => { if (s === 0) { setNp(1); if (gm === "race") setSc("coursePick"); else go(gm, 1); } else if (s === 1) { setNp(2); if (gm === "race") setSc("coursePick"); else go(gm, 2); } else if (s === 2) setSc("menu"); return s; }); }
         else if (sc === "coursePick") { setMenuSel(s => { if (s < 7) { setCr(s); go("race", np); } else if (s === 7) setNight(n => !n); else if (s === 8) setSc("pick"); return s; }); }
         else if (sc === "ctrl") { setMenuSel(s => { if (s === 0) setSc("menu"); return s; }); }
+        else if (sc === "customize") {
+          setMenuSel(s => {
+            const actions = ["fire","rollLeft","rollRight","pause","fireAlt"];
+            if (s < 5) setRemapping({ player: 1, action: actions[s] });
+            else if (s >= 5 && s < 10) setRemapping({ player: 2, action: actions[s - 5] });
+            else if (s === 10) { setGpMap({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 }); setGpMap2({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 }); }
+            else if (s === 11) setInvY1(v => !v);
+            else if (s === 12) setInvY2(v => !v);
+            else if (s === 13) setSc("menu");
+            return s;
+          });
+        }
         else if (sc === "raceEnd" || sc === "battleEnd") { setSc("menu"); }
       }
       if (bBtn) {
@@ -81,6 +97,7 @@ export default function Game() {
         if (sc === "pick") setSc("menu");
         else if (sc === "coursePick") setSc("pick");
         else if (sc === "ctrl") setSc("menu");
+        else if (sc === "customize") setSc("menu");
         else if (sc === "raceEnd" || sc === "battleEnd") setSc("menu");
       }
       // Pause menu navigation
@@ -999,13 +1016,17 @@ export default function Game() {
       const tMulP = r.tumble > 0 ? 0.2 : 1;
       if (ks[lK]) r.tr = 50 * D * tMulP; else if (ks[rK]) r.tr = -50 * D * tMulP; else r.tr = 0;
       if (ks[uK]) r.tp = 25 * D * tMulP; else if (ks[dK]) r.tp = -20 * D * tMulP; else r.tp *= 0.9;
-      // Analog stick override — proportional turning from controller with center snap
-      const gpPad = lK === "KeyA" ? ks._gp1 : lK === "ArrowLeft" ? ks._gp2 : null;
-      const gpBM = lK === "KeyA" ? ks._bm1 : lK === "ArrowLeft" ? ks._bm2 : null;
+      // Analog stick override — calibrated, inverted, proportional, center snap
+      const isP1 = lK === "KeyA";
+      const gpPad = isP1 ? ks._gp1 : lK === "ArrowLeft" ? ks._gp2 : null;
+      const gpBM = isP1 ? ks._bm1 : lK === "ArrowLeft" ? ks._bm2 : null;
       if (gpPad) {
-        const glx = gpPad.axes[0], gly = gpPad.axes[1], gdz = 0.3;
-        if (Math.abs(glx) > gdz) r.tr = -glx * 50 * D * tMulP; else r.tr = 0;
-        if (Math.abs(gly) > gdz) r.tp = -gly * 25 * D * tMulP; else r.tp *= 0.8;
+        const glx = isP1 ? ks._gp1X : ks._gp2X;
+        const gly = isP1 ? ks._gp1Y : ks._gp2Y;
+        if (glx !== undefined) {
+          if (Math.abs(glx) > 0.3) r.tr = -glx * 50 * D * tMulP; else r.tr = 0;
+          if (Math.abs(gly) > 0.4) r.tp = -gly * 25 * D * tMulP; else r.tp *= 0.7;
+        }
       }
       r.rl += (r.tr - r.rl) * dt * 4;
       r.p += (r.tp - r.p) * dt * 3;
@@ -2160,23 +2181,32 @@ export default function Game() {
     }
 
     function mainUpdate() {
-      // Gamepad polling — store analog values separately, use configurable button map
+      // Gamepad polling — calibrated axes, configurable buttons, invert Y
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
       const gp1 = gamepads[0] || null, gp2 = gamepads[1] || null;
-      const gpDZ = 0.3, bm1 = gpMapRef.current, bm2 = gpMap2Ref.current;
+      const dzX = 0.3, dzY = 0.4, bm1 = gpMapRef.current, bm2 = gpMap2Ref.current;
       ky.current._gp1 = gp1; ky.current._gp2 = gp2;
       ky.current._bm1 = bm1; ky.current._bm2 = bm2;
+      // Calibrate on first detection
+      if (gp1 && !ky.current._gp1Cal) ky.current._gp1Cal = { x: gp1.axes[0], y: gp1.axes[1] };
+      if (gp2 && !ky.current._gp2Cal) ky.current._gp2Cal = { x: gp2.axes[0], y: gp2.axes[1] };
       if (gp1) {
-        const lx = gp1.axes[0], ly = gp1.axes[1];
-        if (Math.abs(lx) > gpDZ) { ky.current[lx < 0 ? "KeyA" : "KeyD"] = true; }
-        if (Math.abs(ly) > gpDZ) { ky.current[ly < 0 ? "KeyW" : "KeyS"] = true; }
+        const cal = ky.current._gp1Cal;
+        const lx = gp1.axes[0] - cal.x, ly0 = gp1.axes[1] - cal.y;
+        const ly = invY1Ref.current ? -ly0 : ly0;
+        ky.current._gp1X = lx; ky.current._gp1Y = ly;
+        if (Math.abs(lx) > dzX) { ky.current[lx < 0 ? "KeyA" : "KeyD"] = true; }
+        if (Math.abs(ly) > dzY) { ky.current[ly < 0 ? "KeyW" : "KeyS"] = true; }
         ky.current["Space"] = ky.current["Space"] || gp1.buttons[bm1.fire]?.pressed || gp1.buttons[bm1.fireAlt]?.pressed;
         if (gp1.buttons[bm1.pause]?.pressed) ky.current["KeyP"] = true;
       }
       if (gp2) {
-        const lx = gp2.axes[0], ly = gp2.axes[1];
-        if (Math.abs(lx) > gpDZ) { ky.current[lx < 0 ? "ArrowLeft" : "ArrowRight"] = true; }
-        if (Math.abs(ly) > gpDZ) { ky.current[ly < 0 ? "ArrowUp" : "ArrowDown"] = true; }
+        const cal = ky.current._gp2Cal;
+        const lx = gp2.axes[0] - cal.x, ly0 = gp2.axes[1] - cal.y;
+        const ly = invY2Ref.current ? -ly0 : ly0;
+        ky.current._gp2X = lx; ky.current._gp2Y = ly;
+        if (Math.abs(lx) > dzX) { ky.current[lx < 0 ? "ArrowLeft" : "ArrowRight"] = true; }
+        if (Math.abs(ly) > dzY) { ky.current[ly < 0 ? "ArrowUp" : "ArrowDown"] = true; }
         ky.current["ShiftRight"] = ky.current["ShiftRight"] || gp2.buttons[bm2.fire]?.pressed || gp2.buttons[bm2.fireAlt]?.pressed;
         if (gp2.buttons[bm2.pause]?.pressed) ky.current["KeyP"] = true;
       }
@@ -2471,6 +2501,7 @@ export default function Game() {
         <button onClick={() => { setGm("race"); setSc("pick"); }} style={{ ...btn("RACE", "#fbbf24"), border: menuSel === 0 ? "2px solid #fff" : "2px solid #fbbf2466" }}>RACE</button>
         <button onClick={() => { setGm("battle"); setSc("pick"); }} style={{ ...btn("BATTLE", "#ef4444"), border: menuSel === 1 ? "2px solid #fff" : "2px solid #ef444466" }}>BATTLE</button>
         <button onClick={() => setSc("ctrl")} style={{ padding: "14px", background: "rgba(255,255,255,0.03)", border: menuSel === 2 ? "2px solid #fff" : "1px solid rgba(255,255,255,0.12)", borderRadius: "14px", color: "#94a3b8", fontSize: "16px", fontWeight: 700, cursor: "pointer", letterSpacing: "2px" }}>CONTROLS</button>
+        <button onClick={() => setSc("customize")} style={{ padding: "14px", background: "rgba(139,92,246,0.06)", border: menuSel === 3 ? "2px solid #fff" : "1px solid rgba(139,92,246,0.25)", borderRadius: "14px", color: "#a78bfa", fontSize: "16px", fontWeight: 700, cursor: "pointer", letterSpacing: "2px" }}>🎮 CUSTOMIZE</button>
       </div>
       <p style={{ fontSize: "10px", color: "#4a5568", marginTop: "20px" }}>A flying racing game by Ephraim</p>
     </div>
@@ -2550,28 +2581,54 @@ export default function Game() {
       </div>
       <div style={{ background: "rgba(0,0,0,0.25)", borderRadius: "12px", padding: "12px 20px", border: "2px solid #8b5cf644", marginBottom: "12px", width: "min(460px,90vw)", textAlign: "left" }}>
         <div style={{ color: "#8b5cf6", fontWeight: 900, fontSize: "13px", marginBottom: "6px" }}>🎮 CONTROLLER</div>
-        <div style={{ fontSize: "11px", color: "#94a3b8", lineHeight: "1.8" }}>Left Stick = Fly · Navigate menus with stick + A/B</div>
-        <div style={{ fontSize: "10px", color: "#64748b", marginTop: "6px", marginBottom: "8px" }}>Xbox controllers — USB or Bluetooth. P1 = 1st controller, P2 = 2nd.</div>
-        {remapping ? (
-          <div style={{ padding: "8px", background: "rgba(139,92,246,0.15)", borderRadius: "8px", textAlign: "center" }}>
-            <div style={{ fontSize: "12px", color: "#a78bfa", fontWeight: 700 }}>Press a button for: {remapping.action.toUpperCase()}</div>
-            <button onClick={() => setRemapping(null)} style={{ marginTop: "6px", padding: "4px 12px", background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", color: "#64748b", fontSize: "10px", cursor: "pointer" }}>Cancel</button>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-            {["fire","rollLeft","rollRight","pause","fireAlt"].map(act => (
-              <button key={act} onClick={() => setRemapping({ player: 1, action: act })} style={{ padding: "3px 8px", background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)", borderRadius: "6px", color: "#a78bfa", fontSize: "10px", cursor: "pointer" }}>
-                {act === "fire" ? "Weapon" : act === "rollLeft" ? "Roll L" : act === "rollRight" ? "Roll R" : act === "pause" ? "Pause" : "Weapon2"}: B{gpMap[act]}
-              </button>
-            ))}
-            <button onClick={() => { setGpMap({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 }); setGpMap2({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 }); }} style={{ padding: "3px 8px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "#64748b", fontSize: "10px", cursor: "pointer" }}>Reset</button>
-          </div>
-        )}
+        <div style={{ fontSize: "11px", color: "#94a3b8", lineHeight: "1.8" }}>Left Stick = Fly · A/RB = Weapon · X = Roll Left · B = Roll Right · Start = Pause</div>
+        <div style={{ fontSize: "10px", color: "#64748b", marginTop: "4px" }}>Xbox via USB or Bluetooth · Remap buttons in 🎮 CUSTOMIZE from main menu</div>
       </div>
       <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "20px" }}>🟨 Gold cubes = powerups · 🔫 Gun · 🚀 Boost · 💥 Homing Missile · ⭐ Star · 🛡️ Flares · ⚡ Lightning Storm · 🌪️ Tornado — pulls racers in and throws them backward</div>
       <button onClick={() => setSc("menu")} style={{ padding: "12px 28px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "10px", color: "#e2e8f0", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>Back to Menu</button>
     </div>
   );
+
+  // CUSTOMIZE — controller button remapping + invert Y
+  if (sc === "customize") {
+    const BN = { 0:"A", 1:"B", 2:"X", 3:"Y", 4:"LB", 5:"RB", 6:"LT", 7:"RT", 8:"View", 9:"Start", 10:"L3", 11:"R3", 12:"Up", 13:"Down", 14:"Left", 15:"Right" };
+    const acts = ["fire","rollLeft","rollRight","pause","fireAlt"];
+    const actNames = { fire: "Weapon", rollLeft: "Roll Left", rollRight: "Roll Right", pause: "Pause", fireAlt: "Weapon 2" };
+    const row = (act, map, pn, idx) => (
+      <div key={act + pn} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+        <span style={{ color: "#94a3b8", fontSize: "12px" }}>{actNames[act]}</span>
+        <button onClick={() => setRemapping({ player: pn, action: act })}
+          style={{ padding: "3px 10px", background: remapping?.action === act && remapping?.player === pn ? "rgba(139,92,246,0.3)" : "rgba(139,92,246,0.08)", border: menuSel === idx ? "1px solid #fff" : "1px solid rgba(139,92,246,0.3)", borderRadius: "6px", color: "#a78bfa", fontSize: "12px", fontWeight: 700, cursor: "pointer", minWidth: "50px" }}>
+          {remapping?.action === act && remapping?.player === pn ? "Press..." : (BN[map[act]] || "B" + map[act])}
+        </button>
+      </div>
+    );
+    return (
+      <div style={{ width: "100%", minHeight: "100vh", background: bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: ft, color: "#e2e8f0", padding: "20px", textAlign: "center" }}>
+        <h2 style={{ fontSize: "24px", fontWeight: 900, marginBottom: "4px", color: "#a78bfa" }}>🎮 CONTROLLER SETUP</h2>
+        <p style={{ fontSize: "11px", color: "#64748b", marginBottom: "16px" }}>Click a button name or press A to remap · Press any controller button to assign</p>
+        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", justifyContent: "center", marginBottom: "16px", width: "min(480px,95vw)" }}>
+          <div style={{ background: "rgba(0,0,0,0.25)", borderRadius: "12px", padding: "14px 18px", border: "2px solid #3b82f633", flex: "1", minWidth: "180px" }}>
+            <div style={{ color: "#3b82f6", fontWeight: 900, fontSize: "13px", marginBottom: "8px" }}>PLAYER 1</div>
+            {acts.map((a, i) => row(a, gpMap, 1, i))}
+          </div>
+          <div style={{ background: "rgba(0,0,0,0.25)", borderRadius: "12px", padding: "14px 18px", border: "2px solid #ef444433", flex: "1", minWidth: "180px" }}>
+            <div style={{ color: "#ef4444", fontWeight: 900, fontSize: "13px", marginBottom: "8px" }}>PLAYER 2</div>
+            {acts.map((a, i) => row(a, gpMap2, 2, i + 5))}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginBottom: "16px" }}>
+          <button onClick={() => { setGpMap({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 }); setGpMap2({ fire: 0, rollLeft: 2, rollRight: 1, pause: 9, fireAlt: 5 }); }}
+            style={{ padding: "8px 16px", background: "rgba(255,255,255,0.03)", border: menuSel === 10 ? "2px solid #fff" : "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#64748b", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>Reset Defaults</button>
+          <button onClick={() => setInvY1(v => !v)}
+            style={{ padding: "8px 16px", background: invY1 ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.03)", border: menuSel === 11 ? "2px solid #fff" : (invY1 ? "1px solid #22c55e" : "1px solid rgba(255,255,255,0.1)"), borderRadius: "8px", color: invY1 ? "#22c55e" : "#64748b", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>P1 Invert Y: {invY1 ? "ON" : "OFF"}</button>
+          <button onClick={() => setInvY2(v => !v)}
+            style={{ padding: "8px 16px", background: invY2 ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.03)", border: menuSel === 12 ? "2px solid #fff" : (invY2 ? "1px solid #22c55e" : "1px solid rgba(255,255,255,0.1)"), borderRadius: "8px", color: invY2 ? "#22c55e" : "#64748b", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>P2 Invert Y: {invY2 ? "ON" : "OFF"}</button>
+        </div>
+        <button onClick={() => setSc("menu")} style={{ padding: "10px 24px", background: "rgba(255,255,255,0.05)", border: menuSel === 13 ? "2px solid #fff" : "1px solid rgba(255,255,255,0.15)", borderRadius: "10px", color: "#e2e8f0", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}>Back to Menu</button>
+      </div>
+    );
+  }
 
   // RACE RESULT
   if (sc === "raceEnd" && ed) return (
