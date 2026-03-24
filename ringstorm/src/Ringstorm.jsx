@@ -372,14 +372,7 @@ export default function Game() {
         for (let v = 0; v < nv; v++) verts.push(0.8 + Math.random() * 0.4);
         asteroids.push({ x: ax, y: ay, z: az, radius: rad, rot: Math.random() * Math.PI * 2, rotSpeed: 0.005 + Math.random() * 0.015, color: astColors[Math.floor(Math.random() * astColors.length)], verts, nv });
       }
-      // Safety cleanup — remove asteroids too close to gates or path midpoints
-      for (let i = asteroids.length - 1; i >= 0; i--) {
-        const a = asteroids[i]; let tooClose = false;
-        for (const g of crs) { if (Math.sqrt((a.x - g.x) ** 2 + (a.y - g.y) ** 2 + (a.z - g.z) ** 2) < 60 + a.radius) { tooClose = true; break; } }
-        if (!tooClose) for (let gi2 = 0; gi2 < NG; gi2++) { const ga = crs[gi2], gb = crs[(gi2 + 1) % NG]; const mx = (ga.x + gb.x) / 2, my = (ga.y + gb.y) / 2, mz = (ga.z + gb.z) / 2; if (Math.sqrt((a.x - mx) ** 2 + (a.y - my) ** 2 + (a.z - mz) ** 2) < 50 + a.radius) { tooClose = true; break; } }
-        if (tooClose) asteroids.splice(i, 1);
-      }
-      // Planets — decorative, no collision
+      // Planets — solid objects with collision
       planets.push({ x: 800, y: 300, z: 600, radius: 200, type: "gas" });
       planets.push({ x: -600, y: 200, z: -800, radius: 80, type: "rocky" });
       // Space station near midpoint of gates 2-3
@@ -388,6 +381,15 @@ export default function Game() {
       const slen = Math.sqrt(sdx * sdx + sdz * sdz) || 1;
       const spx = -sdz / slen, spz = sdx / slen;
       spaceStation = { x: (sg1.x + sg2.x) / 2 + spx * 80, y: (sg1.y + sg2.y) / 2, z: (sg1.z + sg2.z) / 2 + spz * 80, rot: 0 };
+      // Safety cleanup — remove asteroids too close to gates, path midpoints, planets, or station
+      for (let i = asteroids.length - 1; i >= 0; i--) {
+        const a = asteroids[i]; let tooClose = false;
+        for (const g of crs) { if (Math.sqrt((a.x - g.x) ** 2 + (a.y - g.y) ** 2 + (a.z - g.z) ** 2) < 60 + a.radius) { tooClose = true; break; } }
+        if (!tooClose) for (let gi2 = 0; gi2 < NG; gi2++) { const ga = crs[gi2], gb = crs[(gi2 + 1) % NG]; const mx = (ga.x + gb.x) / 2, my = (ga.y + gb.y) / 2, mz = (ga.z + gb.z) / 2; if (Math.sqrt((a.x - mx) ** 2 + (a.y - my) ** 2 + (a.z - mz) ** 2) < 50 + a.radius) { tooClose = true; break; } }
+        if (!tooClose) for (const pl of planets) { if (Math.sqrt((a.x - pl.x) ** 2 + (a.y - pl.y) ** 2 + (a.z - pl.z) ** 2) < pl.radius + a.radius + 20) { tooClose = true; break; } }
+        if (!tooClose && spaceStation && Math.sqrt((a.x - spaceStation.x) ** 2 + (a.y - spaceStation.y) ** 2 + (a.z - spaceStation.z) ** 2) < 100) tooClose = true;
+        if (tooClose) asteroids.splice(i, 1);
+      }
     }
 
     // Shortcut bonus gates — one per course (race only)
@@ -679,10 +681,14 @@ export default function Game() {
         const beamThick = 10;
         if (along2 > 0 && along2 < archLen && perpDist < ar.w * 0.6 && r.y > ar.y + ar.ht - beamThick && r.y < ar.y + ar.ht + 5) { boom(r); return 1; }
       }
-      // Asteroid collision (Deep Space)
+      // Deep Space collision — asteroids and planets
       for (const ast of asteroids) {
         const d = Math.sqrt((r.x - ast.x) ** 2 + (r.y - ast.y) ** 2 + (r.z - ast.z) ** 2);
         if (d < ast.radius + 8) { boom(r); return 1; }
+      }
+      for (const pl of planets) {
+        const d = Math.sqrt((r.x - pl.x) ** 2 + (r.y - pl.y) ** 2 + (r.z - pl.z) ** 2);
+        if (d < pl.radius + 10) { boom(r); return 1; }
       }
       if (r.y > 600) r.y = 600;
       return 0;
@@ -1023,15 +1029,38 @@ export default function Game() {
       }
       x.fillStyle = sg; x.fillRect(0, 0, W, vh);
       if (cr === 6) {
-        // Deep space stars — 60 fixed positions
+        // Deep space stars — 60 sparkle shapes
+        const brightStars = [3,11,17,24,31,38,47,55]; // 8 brightest
         for (let si = 0; si < 60; si++) {
           const sx2 = ((si * 113.7 + 31) % W), sy2 = ((si * 73.9 + 19) % vh);
-          const tw = si % 7 < 2 ? Math.sin(fc * 0.02 + si * 1.7) * 0.3 : 0;
-          const br = 0.4 + (si * 17 % 10) / 10 * 0.6 + tw;
-          x.fillStyle = `rgba(255,255,255,${Math.min(1, br)})`;
-          const sz2 = 1 + (si % 4 === 0 ? 2 : si % 3 === 0 ? 1 : 0);
-          x.fillRect(sx2, sy2, sz2, sz2);
+          const tw = Math.sin(fc * 0.02 + si * 1.7);
+          const br = 0.3 + (si * 17 % 10) / 10 * 0.5 + tw * 0.2;
+          const al = Math.min(1, Math.max(0.3, br));
+          const isBright = brightStars.includes(si);
+          const len = isBright ? 3 + (si % 3) : 1 + (si % 3);
+          x.strokeStyle = `rgba(255,255,255,${al})`; x.lineWidth = 1;
+          x.beginPath(); x.moveTo(sx2 - len, sy2); x.lineTo(sx2 + len, sy2); x.stroke();
+          x.beginPath(); x.moveTo(sx2, sy2 - len); x.lineTo(sx2, sy2 + len); x.stroke();
+          if (isBright) {
+            const dl = len * 0.7;
+            x.beginPath(); x.moveTo(sx2 - dl, sy2 - dl); x.lineTo(sx2 + dl, sy2 + dl); x.stroke();
+            x.beginPath(); x.moveTo(sx2 + dl, sy2 - dl); x.lineTo(sx2 - dl, sy2 + dl); x.stroke();
+            x.save(); x.shadowColor = "rgba(255,255,255,0.6)"; x.shadowBlur = 3;
+            x.fillStyle = `rgba(255,255,255,${al})`; x.beginPath(); x.arc(sx2, sy2, 1, 0, Math.PI * 2); x.fill();
+            x.restore();
+          }
         }
+        // 3 colored stars
+        const colorStars = [[W*0.15, vh*0.12, "rgba(255,180,150,"], [W*0.65, vh*0.08, "rgba(150,180,255,"], [W*0.85, vh*0.35, "rgba(255,255,180,"]];
+        colorStars.forEach(([cx, cy, col]) => {
+          const cal = 0.6 + Math.sin(fc * 0.015 + cx) * 0.3;
+          x.save(); x.shadowColor = col + "0.5)"; x.shadowBlur = 4;
+          x.strokeStyle = col + `${cal})`; x.lineWidth = 1.5;
+          x.beginPath(); x.moveTo(cx - 4, cy); x.lineTo(cx + 4, cy); x.stroke();
+          x.beginPath(); x.moveTo(cx, cy - 4); x.lineTo(cx, cy + 4); x.stroke();
+          x.fillStyle = col + `${cal})`; x.beginPath(); x.arc(cx, cy, 1.5, 0, Math.PI * 2); x.fill();
+          x.restore();
+        });
         // Nebula — subtle purple-blue haze
         const nebG = x.createRadialGradient(W * 0.3, vh * 0.25, 0, W * 0.3, vh * 0.25, vh * 0.4);
         nebG.addColorStop(0, "rgba(80,30,120,0.08)"); nebG.addColorStop(0.5, "rgba(30,60,120,0.04)"); nebG.addColorStop(1, "rgba(0,0,0,0)");
