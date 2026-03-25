@@ -36,7 +36,8 @@ func _ready():
 	g.add_point(0.5, Color(0.04, 0.08, 0.18))
 	g.set_color(1, Color(0.07, 0.12, 0.25))
 	gt.gradient = g
-	gt.fill_direction = GradientTexture2D.FILL_TOP_TO_BOTTOM
+	gt.fill_from = Vector2(0, 0)
+	gt.fill_to = Vector2(0, 1)
 	bg.texture = gt
 	bg.stretch_mode = TextureRect.STRETCH_SCALE
 	add_child(bg)
