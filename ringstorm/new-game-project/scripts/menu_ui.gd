@@ -1,5 +1,5 @@
 extends CanvasLayer
-# Full menu system — main menu, mode select, course select, pause, results
+# Polished menu system — gradient backgrounds, styled buttons, consistent design
 # Ported from Ringstorm.jsx menu screens
 
 signal start_race(num_players: int, course_idx: int)
@@ -12,7 +12,7 @@ var current_screen: String = "main"
 var selected_mode: String = ""
 var selected_players: int = 1
 var container: Control
-var bg: ColorRect
+var bg: Control  # Background (TextureRect or ColorRect)
 
 const COURSES = [
 	{ "name": "GRAND CANYON", "emoji": "🏜️", "desc": "Race through desert canyons", "color": Color(0.98, 0.45, 0.09) },
@@ -25,11 +25,20 @@ const COURSES = [
 ]
 
 func _ready():
-	layer = 10  # Above game
-	process_mode = Node.PROCESS_MODE_ALWAYS  # Must process while tree is paused
-	bg = ColorRect.new()
-	bg.color = Color(0.04, 0.06, 0.1, 1.0)
+	layer = 10
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Gradient background
+	bg = TextureRect.new()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var gt = GradientTexture2D.new()
+	var g = Gradient.new()
+	g.set_color(0, Color(0.02, 0.04, 0.10))
+	g.add_point(0.5, Color(0.04, 0.08, 0.18))
+	g.set_color(1, Color(0.07, 0.12, 0.25))
+	gt.gradient = g
+	gt.fill_direction = GradientTexture2D.FILL_TOP_TO_BOTTOM
+	bg.texture = gt
+	bg.stretch_mode = TextureRect.STRETCH_SCALE
 	add_child(bg)
 	container = Control.new()
 	container.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -40,31 +49,37 @@ func _clear():
 	for child in container.get_children():
 		child.queue_free()
 
+# ==================== SCREENS ====================
+
 func _show_main_menu():
 	_clear()
 	current_screen = "main"
 	var vbox = _centered_vbox()
-	_add_title(vbox, "RINGSTORM", 42, Color(1.0, 0.75, 0.15))
-	_add_title(vbox, "RACERS", 18, Color(0.58, 0.64, 0.72))
-	_add_title(vbox, "A flying racing game by Ephraim", 11, Color(0.3, 0.35, 0.42))
-	_add_spacer(vbox, 30)
-	_add_btn(vbox, "RACE", Color(1.0, 0.75, 0.15), func(): _show_player_select("race"))
-	_add_btn(vbox, "BATTLE", Color(0.94, 0.27, 0.27), func(): _show_player_select("battle"))
-	_add_spacer(vbox, 10)
-	_add_btn(vbox, "CONTROLS", Color(0.58, 0.64, 0.72), func(): _show_controls(), true)
-	_add_btn(vbox, "SETTINGS", Color(0.58, 0.64, 0.72), func(): _show_settings(), true)
+	_add_title(vbox, "✈️", 64, Color(1.0, 0.85, 0.4))
+	_add_title(vbox, "RINGSTORM", 58, Color(1.0, 0.75, 0.15))
+	_add_title(vbox, "R A C E R S", 20, Color(0.55, 0.6, 0.72))
+	_add_title(vbox, "A flying racing game by Ephraim", 12, Color(0.3, 0.35, 0.42))
+	_add_spacer(vbox, 35)
+	_styled_btn(vbox, "RACE", Color(1.0, 0.75, 0.15), func(): _show_player_select("race"))
+	_styled_btn(vbox, "BATTLE", Color(0.9, 0.25, 0.25), func(): _show_player_select("battle"))
+	_add_spacer(vbox, 12)
+	_styled_btn(vbox, "CONTROLS", Color(0.5, 0.55, 0.7), func(): _show_controls(), true)
+	_styled_btn(vbox, "SETTINGS", Color(0.45, 0.5, 0.6), func(): _show_settings(), true)
+	_add_spacer(vbox, 20)
+	_add_title(vbox, "v0.1 — Godot Edition", 10, Color(0.22, 0.26, 0.32))
 
 func _show_player_select(mode: String):
 	_clear()
 	selected_mode = mode
 	current_screen = "players"
 	var vbox = _centered_vbox()
-	_add_title(vbox, mode.to_upper() + " MODE", 28, Color(1.0, 0.75, 0.15))
-	_add_spacer(vbox, 20)
-	_add_btn(vbox, "1 PLAYER", Color(0.23, 0.51, 0.96), func(): _on_players_selected(1))
-	_add_btn(vbox, "2 PLAYERS", Color(0.94, 0.27, 0.27), func(): _on_players_selected(2))
-	_add_spacer(vbox, 15)
-	_add_btn(vbox, "BACK", Color(0.5, 0.55, 0.65), func(): _show_main_menu(), true)
+	var accent = Color(1.0, 0.75, 0.15) if mode == "race" else Color(0.9, 0.25, 0.25)
+	_add_title(vbox, mode.to_upper() + " MODE", 32, accent)
+	_add_spacer(vbox, 25)
+	_styled_btn(vbox, "1 PLAYER", Color(0.23, 0.51, 0.96), func(): _on_players_selected(1))
+	_styled_btn(vbox, "2 PLAYERS", Color(0.94, 0.27, 0.27), func(): _on_players_selected(2))
+	_add_spacer(vbox, 18)
+	_styled_btn(vbox, "BACK", Color(0.45, 0.5, 0.6), func(): _show_main_menu(), true)
 
 func _on_players_selected(n: int):
 	selected_players = n
@@ -77,82 +92,77 @@ func _show_course_select():
 	_clear()
 	current_screen = "course"
 	var vbox = _centered_vbox()
-	_add_title(vbox, "SELECT COURSE", 24, Color(1.0, 0.75, 0.15))
-	_add_spacer(vbox, 10)
+	_add_title(vbox, "SELECT COURSE", 28, Color(1.0, 0.75, 0.15))
+	_add_spacer(vbox, 12)
 	for i in range(COURSES.size()):
 		var c = COURSES[i]
-		var idx = i  # Capture for lambda
-		_add_btn(vbox, c["emoji"] + " " + c["name"], c["color"],
-			func(): start_race.emit(selected_players, idx), false, 14)
-	_add_spacer(vbox, 10)
-	_add_btn(vbox, "BACK", Color(0.5, 0.55, 0.65), func(): _show_player_select(selected_mode), true)
+		var idx = i
+		_styled_btn(vbox, c["emoji"] + "  " + c["name"], c["color"],
+			func(): start_race.emit(selected_players, idx), false, 15)
+	_add_spacer(vbox, 12)
+	_styled_btn(vbox, "BACK", Color(0.45, 0.5, 0.6), func(): _show_player_select(selected_mode), true)
 
 func _show_controls():
 	_clear()
 	current_screen = "controls"
 	var vbox = _centered_vbox()
-	_add_title(vbox, "CONTROLS", 28, Color(0.58, 0.64, 0.72))
-	_add_spacer(vbox, 15)
-	_add_title(vbox, "KEYBOARD", 16, Color(0.23, 0.51, 0.96))
-	_add_title(vbox, "W/S — Rise / Dive", 13, Color(0.6, 0.65, 0.7))
-	_add_title(vbox, "A/D — Turn Left / Right", 13, Color(0.6, 0.65, 0.7))
-	_add_title(vbox, "Space — Fire Weapon", 13, Color(0.6, 0.65, 0.7))
-	_add_title(vbox, "Shift — Brake", 13, Color(0.6, 0.65, 0.7))
-	_add_title(vbox, "Double-tap A/D — Barrel Roll", 13, Color(0.6, 0.65, 0.7))
-	_add_title(vbox, "P — Pause", 13, Color(0.6, 0.65, 0.7))
-	_add_spacer(vbox, 10)
-	_add_title(vbox, "XBOX CONTROLLER", 16, Color(0.13, 0.77, 0.37))
-	_add_title(vbox, "Left Stick — Fly", 13, Color(0.6, 0.65, 0.7))
-	_add_title(vbox, "A / RB — Fire Weapon", 13, Color(0.6, 0.65, 0.7))
-	_add_title(vbox, "B — Roll Right · X — Roll Left", 13, Color(0.6, 0.65, 0.7))
-	_add_title(vbox, "LT — Brake · Start — Pause", 13, Color(0.6, 0.65, 0.7))
-	_add_spacer(vbox, 15)
-	_add_btn(vbox, "BACK", Color(0.5, 0.55, 0.65), func(): _show_main_menu(), true)
+	_add_title(vbox, "CONTROLS", 32, Color(0.55, 0.6, 0.72))
+	_add_spacer(vbox, 18)
+	_add_title(vbox, "— KEYBOARD —", 14, Color(0.23, 0.51, 0.96))
+	for t in ["W/S — Rise / Dive", "A/D — Turn Left / Right", "Space — Fire Weapon", "Shift — Brake", "Double-tap A/D — Barrel Roll", "P — Pause"]:
+		_add_title(vbox, t, 13, Color(0.55, 0.6, 0.68))
+	_add_spacer(vbox, 12)
+	_add_title(vbox, "— XBOX CONTROLLER —", 14, Color(0.13, 0.77, 0.37))
+	for t in ["Left Stick — Fly", "A / RB — Fire Weapon", "B — Roll Right · X — Roll Left", "LT — Brake · Start — Pause"]:
+		_add_title(vbox, t, 13, Color(0.55, 0.6, 0.68))
+	_add_spacer(vbox, 18)
+	_styled_btn(vbox, "BACK", Color(0.45, 0.5, 0.6), func(): _show_main_menu(), true)
 
 func show_pause_menu():
 	visible = true
-	bg.color.a = 0.85
+	bg.modulate.a = 0.92
 	_clear()
 	current_screen = "pause"
 	var vbox = _centered_vbox()
-	_add_title(vbox, "PAUSED", 36, Color(0.58, 0.64, 0.72))
-	_add_spacer(vbox, 25)
-	_add_btn(vbox, "RESUME", Color(0.13, 0.77, 0.37), func(): resume_game.emit())
-	_add_btn(vbox, "RESTART", Color(1.0, 0.75, 0.15), func(): restart_game.emit())
-	_add_btn(vbox, "MAIN MENU", Color(0.94, 0.27, 0.27), func(): quit_to_menu.emit())
+	_add_title(vbox, "⏸️", 48, Color(0.55, 0.6, 0.72))
+	_add_title(vbox, "PAUSED", 36, Color(0.55, 0.6, 0.72))
+	_add_spacer(vbox, 30)
+	_styled_btn(vbox, "RESUME", Color(0.13, 0.77, 0.37), func(): resume_game.emit())
+	_styled_btn(vbox, "RESTART", Color(1.0, 0.75, 0.15), func(): restart_game.emit())
+	_styled_btn(vbox, "MAIN MENU", Color(0.9, 0.25, 0.25), func(): quit_to_menu.emit())
 
 func show_results(finish_order: Array):
 	visible = true
-	bg.color.a = 0.9
+	bg.modulate.a = 0.95
 	_clear()
 	current_screen = "results"
 	var vbox = _centered_vbox()
+	_add_title(vbox, "🏁", 48, Color(1.0, 0.85, 0.2))
 	_add_title(vbox, "RACE RESULTS", 32, Color(1.0, 0.75, 0.15))
-	_add_spacer(vbox, 15)
+	_add_spacer(vbox, 18)
 	for i in range(finish_order.size()):
 		var r = finish_order[i]
-		var name_text = r.racer_name if "racer_name" in r else r.name
+		var nm = r.racer_name if "racer_name" in r else r.name
 		var suffix = ["st", "nd", "rd", "th", "th"][min(i, 4)]
 		var time_text = "%.1fs" % (r.finish_time / 60.0)
-		var color = Color(1.0, 0.85, 0.2) if i == 0 else Color(0.7, 0.7, 0.75) if i == 1 else Color(0.5, 0.55, 0.6)
-		_add_title(vbox, str(i + 1) + suffix + "  " + name_text + "  " + time_text, 18, color)
-	_add_spacer(vbox, 20)
-	_add_btn(vbox, "MAIN MENU", Color(0.58, 0.64, 0.72), func(): quit_to_menu.emit())
+		var color = Color(1.0, 0.85, 0.2) if i == 0 else Color(0.72, 0.72, 0.78) if i == 1 else Color(0.8, 0.55, 0.2) if i == 2 else Color(0.45, 0.5, 0.55)
+		_add_title(vbox, str(i + 1) + suffix + "   " + nm + "   " + time_text, 20, color)
+	_add_spacer(vbox, 25)
+	_styled_btn(vbox, "MAIN MENU", Color(0.55, 0.6, 0.72), func(): quit_to_menu.emit())
 
 func hide_menu():
 	visible = false
 
 func show_menu():
 	visible = true
-	bg.color.a = 1.0
+	bg.modulate.a = 1.0
 	_show_main_menu()
 
-# --- Settings screen ---
+# ==================== SETTINGS ====================
 
 func _show_settings():
 	_clear()
 	current_screen = "settings"
-	# Use a ScrollContainer so sliders don't overflow
 	var scroll = ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.offset_left = 40; scroll.offset_right = -40
@@ -164,8 +174,8 @@ func _show_settings():
 	vbox.add_theme_constant_override("separation", 4)
 	scroll.add_child(vbox)
 
-	_add_title(vbox, "⚙️ SETTINGS", 28, Color(0.58, 0.64, 0.72))
-	_add_title(vbox, "Changes apply instantly", 11, Color(0.4, 0.45, 0.5))
+	_add_title(vbox, "⚙️ SETTINGS", 28, Color(0.55, 0.6, 0.72))
+	_add_title(vbox, "Changes apply instantly", 11, Color(0.35, 0.4, 0.48))
 	_add_spacer(vbox, 8)
 
 	_add_section_header(vbox, "SPEED")
@@ -197,15 +207,15 @@ func _show_settings():
 		AudioServer.set_bus_volume_db(0, linear_to_db(max(v, 0.001)))
 	)
 
-	_add_spacer(vbox, 10)
-	_add_btn(vbox, "RESET TO DEFAULT", Color(0.6, 0.6, 0.6), func(): _reset_settings(), true)
-	_add_btn(vbox, "BACK", Color(0.5, 0.55, 0.65), func(): _show_main_menu(), true)
+	_add_spacer(vbox, 12)
+	_styled_btn(vbox, "RESET TO DEFAULT", Color(0.55, 0.55, 0.55), func(): _reset_settings(), true)
+	_styled_btn(vbox, "BACK", Color(0.45, 0.5, 0.6), func(): _show_main_menu(), true)
 
 func _add_section_header(parent: Control, text: String):
 	var label = Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", 14)
-	label.add_theme_color_override("font_color", Color(0.5, 0.6, 0.8))
+	label.add_theme_color_override("font_color", Color(0.45, 0.55, 0.75))
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	parent.add_child(label)
 
@@ -216,7 +226,7 @@ func _add_slider(parent: Control, label_text: String, current_value: float, min_
 	label.text = label_text
 	label.custom_minimum_size = Vector2(140, 0)
 	label.add_theme_font_size_override("font_size", 12)
-	label.add_theme_color_override("font_color", Color(0.7, 0.75, 0.8))
+	label.add_theme_color_override("font_color", Color(0.6, 0.65, 0.72))
 	row.add_child(label)
 	var slider = HSlider.new()
 	slider.min_value = min_val; slider.max_value = max_val; slider.step = step_val
@@ -244,7 +254,7 @@ func _add_toggle(parent: Control, label_text: String, current_value: bool, on_ch
 	label.text = label_text
 	label.custom_minimum_size = Vector2(140, 0)
 	label.add_theme_font_size_override("font_size", 12)
-	label.add_theme_color_override("font_color", Color(0.7, 0.75, 0.8))
+	label.add_theme_color_override("font_color", Color(0.6, 0.65, 0.72))
 	row.add_child(label)
 	var toggle = CheckButton.new()
 	toggle.button_pressed = current_value
@@ -266,14 +276,16 @@ func _reset_settings():
 	Settings.save_settings()
 	_show_settings()
 
-# --- UI helpers ---
+# ==================== UI HELPERS ====================
 
 func _centered_vbox() -> VBoxContainer:
 	var vbox = VBoxContainer.new()
 	vbox.set_anchors_preset(Control.PRESET_CENTER)
-	vbox.offset_left = -170; vbox.offset_right = 170
-	vbox.offset_top = -250; vbox.offset_bottom = 250
-	vbox.add_theme_constant_override("separation", 8)
+	vbox.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	vbox.grow_vertical = Control.GROW_DIRECTION_BOTH
+	vbox.offset_left = -200; vbox.offset_right = 200
+	vbox.offset_top = -300; vbox.offset_bottom = 300
+	vbox.add_theme_constant_override("separation", 6)
 	container.add_child(vbox)
 	return vbox
 
@@ -290,22 +302,38 @@ func _add_spacer(parent: Control, height: float):
 	s.custom_minimum_size = Vector2(0, height)
 	parent.add_child(s)
 
-func _add_btn(parent: Control, text: String, color: Color, callback: Callable, small: bool = false, font_size: int = 0):
+func _styled_btn(parent: Control, text: String, color: Color, callback: Callable, small: bool = false, font_size: int = 0):
 	var btn = Button.new()
 	btn.text = text
-	btn.custom_minimum_size = Vector2(340, 36 if small else 44)
-	btn.add_theme_font_size_override("font_size", font_size if font_size > 0 else (13 if small else 17))
+	btn.custom_minimum_size = Vector2(360, 38 if small else 52)
+	btn.add_theme_font_size_override("font_size", font_size if font_size > 0 else (14 if small else 20))
 	btn.add_theme_color_override("font_color", color)
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(color.r, color.g, color.b, 0.08)
-	style.border_color = Color(color.r, color.g, color.b, 0.3)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(8)
-	btn.add_theme_stylebox_override("normal", style)
-	var hover = style.duplicate()
-	hover.bg_color = Color(color.r, color.g, color.b, 0.18)
-	hover.border_color = Color(color.r, color.g, color.b, 0.6)
-	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_color_override("font_hover_color", color.lightened(0.25))
+	btn.add_theme_color_override("font_pressed_color", Color.WHITE)
+	# Normal
+	var sn = StyleBoxFlat.new()
+	sn.bg_color = Color(color.r, color.g, color.b, 0.10)
+	sn.border_color = Color(color.r, color.g, color.b, 0.4)
+	sn.set_border_width_all(2)
+	sn.set_corner_radius_all(12)
+	sn.set_content_margin_all(10)
+	btn.add_theme_stylebox_override("normal", sn)
+	# Hover
+	var sh = StyleBoxFlat.new()
+	sh.bg_color = Color(color.r, color.g, color.b, 0.22)
+	sh.border_color = Color(color.r, color.g, color.b, 0.7)
+	sh.set_border_width_all(2)
+	sh.set_corner_radius_all(12)
+	sh.set_content_margin_all(10)
+	btn.add_theme_stylebox_override("hover", sh)
+	# Pressed
+	var sp = StyleBoxFlat.new()
+	sp.bg_color = Color(color.r, color.g, color.b, 0.35)
+	sp.border_color = color
+	sp.set_border_width_all(3)
+	sp.set_corner_radius_all(12)
+	sp.set_content_margin_all(10)
+	btn.add_theme_stylebox_override("pressed", sp)
 	btn.pressed.connect(callback)
 	parent.add_child(btn)
 
