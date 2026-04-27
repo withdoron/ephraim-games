@@ -199,6 +199,7 @@ function drawStageBG(ctx,stageName,cameraX,stageData){
     if(stageData.signs){stageData.signs.forEach(s=>{
       const sx=s.x-cameraX;if(sx<-120||sx>W+120)return;
       const sw=200,sh=40,sy=ceilY+18;
+      if(s.damaged){ctx.save();ctx.translate(sx,sy+sh/2);ctx.rotate(0.087);ctx.translate(-sx,-(sy+sh/2));}
       ctx.fillStyle="#3a3a42";ctx.fillRect(sx-sw/2,sy,sw,sh);
       ctx.strokeStyle="#555";ctx.lineWidth=2;ctx.strokeRect(sx-sw/2,sy,sw,sh);
       // Bolts in corners
@@ -210,6 +211,16 @@ function drawStageBG(ctx,stageName,cameraX,stageData){
       // Text
       ctx.font="bold 18px monospace";ctx.fillStyle=s.color;ctx.textAlign="center";
       ctx.fillText(s.text,sx,sy+sh/2+6);
+      if(s.damaged){
+        ctx.strokeStyle="rgba(0,0,0,0.7)";ctx.lineWidth=2;
+        ctx.beginPath();
+        ctx.moveTo(sx-sw/2+12,sy+sh*0.3);
+        ctx.lineTo(sx-sw/4,sy+sh*0.6);
+        ctx.lineTo(sx+sw/8,sy+sh*0.4);
+        ctx.lineTo(sx+sw/2-12,sy+sh*0.7);
+        ctx.stroke();
+        ctx.restore();
+      }
     });}
     // Ground sections (only draw ground where it exists)
     if(stageData.groundSections){
@@ -653,9 +664,9 @@ const STORY_STAGES=[
      {x:100,text:"ESCAPE THE BASE!",color:"#ff4466"},
      {x:680,text:"GRAB THE ROPE",color:"#ffcc00"},
      {x:2500,text:"ARMORY",color:"#ffcc00"},
-     {x:3300,text:"CAFETERIA",color:"#ffcc00"}
+     {x:3300,text:"CAFETERIA",color:"#ffcc00",damaged:true}
    ],
-   groundSections:[{startX:0,endX:700},{startX:1050,endX:2850},{startX:3100,endX:4900}],
+   groundSections:[{startX:0,endX:700},{startX:1050,endX:2850},{startX:3100,endX:4800}],
    enemies:[
      {type:"stalker",x:420},{type:"stalker",x:520},
      {type:"tank",x:550},{type:"rusher",x:650},
@@ -663,7 +674,7 @@ const STORY_STAGES=[
      {type:"stalker",x:1650},{type:"grunt",x:1850},
      {type:"rusher",x:2000},{type:"tank",x:2400},
      {type:"rusher",x:3350},{type:"stalker",x:3600},
-     {type:"bomber",x:3800},{type:"grunt",x:3900},
+     {type:"stalker",x:3800},{type:"grunt",x:3900},
      {type:"tank",x:4200},{type:"rusher",x:4600}
    ],
    plats:[
