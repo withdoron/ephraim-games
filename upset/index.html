@@ -658,15 +658,16 @@ const GG_WEAPONS=[
 // Story mode data
 const STORY_STAGES=[
   // ===== STAGE 1: MILITARY BASE — FLOOR 1 =====
-  {id:1,name:"MILITARY BASE",width:5000,bg:"#000",gnd:"#1a1a2e",gndLine:"#3a3a42",platFill:"#3a3a4e",platTop:"#555",platBot:"#1a1a2e",platSide:"#2a2a3e",
+  {id:1,name:"MILITARY BASE",width:7000,bg:"#000",gnd:"#1a1a2e",gndLine:"#3a3a42",platFill:"#3a3a4e",platTop:"#555",platBot:"#1a1a2e",platSide:"#2a2a3e",
    indoor:true,
    signs:[
      {x:100,text:"ESCAPE THE BASE!",color:"#ff4466"},
      {x:680,text:"GRAB THE ROPE",color:"#ffcc00"},
      {x:2500,text:"ARMORY",color:"#ffcc00"},
-     {x:3300,text:"CAFETERIA",color:"#ffcc00",damaged:true}
+     {x:3300,text:"CAFETERIA",color:"#ffcc00",damaged:true},
+     {x:5100,text:"WORKSHOP",color:"#ffcc00",damaged:true}
    ],
-   groundSections:[{startX:0,endX:700},{startX:1050,endX:2850},{startX:3100,endX:4800}],
+   groundSections:[{startX:0,endX:700},{startX:1050,endX:2850},{startX:3100,endX:4800},{startX:5000,endX:6900}],
    enemies:[
      {type:"stalker",x:420},{type:"stalker",x:520},
      {type:"tank",x:550},{type:"rusher",x:650},
@@ -675,7 +676,12 @@ const STORY_STAGES=[
      {type:"rusher",x:2000},{type:"tank",x:2400},
      {type:"rusher",x:3350},{type:"stalker",x:3600},
      {type:"flyer",x:3800},{type:"grunt",x:3900},
-     {type:"tank",x:4200}
+     {type:"tank",x:4200},
+     // ===== Floor 4 (Workshop) =====
+     {type:"stalker",x:5200},{type:"rusher",x:5500},
+     {type:"flyer",x:5900},{type:"stalker",x:6100},
+     {type:"tank",x:6300},{type:"tank",x:6450},
+     {type:"grunt",x:6800}
    ],
    plats:[
      {x:400,y:GND-80,w:80,h:14},{x:500,y:GND-110,w:80,h:14},{x:600,y:GND-60,w:60,h:14},
@@ -684,14 +690,19 @@ const STORY_STAGES=[
      {x:2100,y:GND-60,w:80,h:14},{x:2600,y:GND-80,w:60,h:14},{x:2800,y:GND-100,w:60,h:14},
      {x:3500,y:GND-80,w:80,h:14},{x:3700,y:GND-60,w:60,h:14},
      {x:3850,y:GND-100,w:70,h:14},{x:4050,y:GND-70,w:60,h:14},
-     {x:4350,y:GND-90,w:80,h:14},{x:4550,y:GND-60,w:60,h:14}
+     {x:4350,y:GND-90,w:80,h:14},{x:4550,y:GND-60,w:60,h:14},
+     // ===== Floor 4 platforms =====
+     {x:5350,y:GND-70,w:60,h:14},{x:5550,y:GND-90,w:80,h:14},
+     {x:6050,y:GND-100,w:70,h:14},{x:6200,y:GND-80,w:60,h:14},
+     {x:6600,y:GND-90,w:80,h:14},{x:6750,y:GND-70,w:60,h:14}
    ],
-   acidPools:[{x:200,y:GND,w:80},{x:1600,y:GND,w:60},{x:3350,y:GND,w:150},{x:4400,y:GND,w:80}],
-   spikes:[{x:700,y:GND-16,w:350,h:16},{x:2850,y:GND-16,w:250,h:16},{x:3250,y:GND-16,w:80,h:16}],
+   movingPlats:[{x:5650,y:GND-60,w:80,h:14,axis:"h",speed:1.5,minX:5650,maxX:5850}],
+   acidPools:[{x:200,y:GND,w:80},{x:1600,y:GND,w:60},{x:3350,y:GND,w:150},{x:4400,y:GND,w:80},{x:6500,y:GND,w:80}],
+   spikes:[{x:700,y:GND-16,w:350,h:16},{x:2850,y:GND-16,w:250,h:16},{x:3250,y:GND-16,w:80,h:16},{x:5400,y:GND-16,w:60,h:16},{x:5800,y:GND-16,w:200,h:16,damage:50}],
    ropes:[{anchorX:850,anchorY:40,length:200},{anchorX:2950,anchorY:40,length:200},{anchorX:3400,anchorY:40,length:200}],
-   healthPickups:[{x:1100,y:280},{x:2500,y:GND-20},{x:4100,y:GND-20},{x:4150,y:GND-20}],
+   healthPickups:[{x:1100,y:280},{x:2500,y:GND-20},{x:4100,y:GND-20},{x:4150,y:GND-20},{x:5300,y:GND-20}],
    ammoCrates:[{x:1250,y:GND-30},{x:2580,y:GND-30},{x:4150,y:GND-30}],
-   checkpoints:[2550,4100],extraLife:null,
+   checkpoints:[2550,4100,6700],extraLife:null,
    weaponPickups:[{x:2550,y:GND-40,weaponIdx:1}]
   },
 
@@ -790,9 +801,10 @@ function updateLevelElements(ss,plats,now){
     allP.forEach(p=>{
       if(p.invincible>0)return;
       if(p.x+PW>sp.x&&p.x<sp.x+sp.w&&p.y+PH>sp.y&&p.y<sp.y+sp.h){
-        p.hp-=10;p.flash=8;p.vy=-8;p.vx=(p.x<sp.x+sp.w/2?-4:4);SND.hit();
+        const dmg=sp.damage||10;
+        p.hp-=dmg;p.flash=8;p.vy=-8;p.vx=(p.x<sp.x+sp.w/2?-4:4);SND.hit();
         p.invincible=30;ss.shake={intensity:3,frames:4};
-        ss.dmgNums.push({x:p.x+PW/2,y:p.y-5,text:"-10",color:"#ff4444",life:48,vy:-2});
+        ss.dmgNums.push({x:p.x+PW/2,y:p.y-5,text:"-"+dmg,color:"#ff4444",life:48,vy:-2});
       }
     });
   });
