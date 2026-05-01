@@ -1016,6 +1016,8 @@ function updateLevelElements(ss,plats,now){
         if(Math.abs(p.x+PW/2-ropeBottomX)<50&&Math.abs(p.y+PH/2-ropeBottomY)<50){
           rp.occupied=true;rp.occupant=p;p._onRope=true;rp._ropeFrames=0;
           p.flipping=false;p.flipAngle=0;
+          // Cancel dash state so player isn't translucent / leaving afterimages on the rope
+          p.dashing=0;p.dashTrail=[];
           rp.angularVel=p.vx*0.004;
           for(let i=0;i<4;i++)ss.particles.push({x:ropeBottomX,y:ropeBottomY,vx:(Math.random()-0.5)*3,vy:-Math.random()*2,life:8,color:"#aa8844"});
         }
@@ -1537,7 +1539,7 @@ function drawPerson(ctx,x,y,w,h,color,facing,flash,fr,ammo,reloading,reloadProg,
 
   // === AMMO DOTS === (above the gun, gun-side based on facing)
   const maxShow=Math.min(ammo,10);
-  const ammoX=cx+f*w*0.7,ammoY=y-8;
+  const ammoX=cx+f*w*0.7,ammoY=y+4;
   for(let i=0;i<maxShow;i++){ctx.fillStyle='#ffcc00';ctx.beginPath();ctx.arc(ammoX-(maxShow-1)*3/2+i*3,ammoY,1.5,0,Math.PI*2);ctx.fill();}
   if(reloading){const rbw=26,rbx=ammoX-rbw/2,rby=ammoY-6;ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(rbx,rby,rbw,4);ctx.fillStyle='#ffcc00';ctx.fillRect(rbx,rby,rbw*reloadProg,4);ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=1;ctx.strokeRect(rbx,rby,rbw,4);}
 }
