@@ -1537,11 +1537,8 @@ function drawPerson(ctx,x,y,w,h,color,facing,flash,fr,ammo,reloading,reloadProg,
   // Mouth (tight frown)
   ctx.fillStyle=skD;ctx.fillRect(cx+f*1,hdY+4,3,1);
 
-  // === AMMO DOTS === (above the gun, gun-side based on facing)
-  const maxShow=Math.min(ammo,10);
-  const ammoX=cx+f*w*0.7,ammoY=y+4;
-  for(let i=0;i<maxShow;i++){ctx.fillStyle='#ffcc00';ctx.beginPath();ctx.arc(ammoX-(maxShow-1)*3/2+i*3,ammoY,1.5,0,Math.PI*2);ctx.fill();}
-  if(reloading){const rbw=26,rbx=ammoX-rbw/2,rby=ammoY-6;ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(rbx,rby,rbw,4);ctx.fillStyle='#ffcc00';ctx.fillRect(rbx,rby,rbw*reloadProg,4);ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=1;ctx.strokeRect(rbx,rby,rbw,4);}
+  // === RELOAD BAR === (ammo dots moved to HUD; only the reload progress bar remains floating)
+  if(reloading){const rbw=26,rbx=cx-rbw/2,rby=y-14;ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(rbx,rby,rbw,4);ctx.fillStyle='#ffcc00';ctx.fillRect(rbx,rby,rbw*reloadProg,4);ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=1;ctx.strokeRect(rbx,rby,rbw,4);}
 }
 
 function shadeColor(col,amt){
@@ -2721,13 +2718,24 @@ function startGameLoop(){
         ctx.strokeStyle="rgba(255,255,255,0.1)";ctx.lineWidth=1;ctx.strokeRect(hb.x-25-bw,hb.y,bw,10);
         if(pcards[i].length){ctx.font="12px serif";ctx.textAlign="right";ctx.fillStyle="#fff";ctx.fillText(pcards[i].map(c=>CARDS.find(cd=>cd.id===c)?.icon||"").join(""),hb.x,hb.y+24);ctx.font="bold 14px monospace";}
       }
+      // Ammo display (under HP bar)
+      if(!p.dead){
+        const wpName=gameType==="gungame"?GG_WEAPONS[p.ggLevel].name:(p.stats.weapon||"PISTOL").toUpperCase();
+        const maxA=gameType==="gungame"?GG_WEAPONS[p.ggLevel].ammo:(MAX_AMMO+(p.stats.maxAmmo||0));
+        const ratio=p.ammo/maxA,ammoCol=p.reloading?"#888":(ratio>=1?"#ffcc00":(ratio<0.25?"#ff4444":"#fff"));
+        const ammoText=p.reloading?"RELOAD":(wpName+" "+p.ammo+"/"+maxA);
+        ctx.font="bold 8px monospace";ctx.fillStyle=ammoCol;
+        if(hb.a==="left"){ctx.textAlign="left";ctx.fillText(ammoText,hb.x+25,hb.y+19);}
+        else{ctx.textAlign="right";ctx.fillText(ammoText,hb.x,hb.y+19);}
+        ctx.font="bold 14px monospace";
+      }
     });
     ctx.textAlign="center";ctx.fillStyle="#fff";ctx.font="bold 16px monospace";
     ctx.fillText(scoreText(),W/2,22);
     ctx.font="10px monospace";ctx.fillStyle="#666";
     ctx.fillText("ROUND "+rnd+" \u2014 "+a.name+(gameType==="gungame"?" \u2014 GUN GAME":""),W/2,36);
     if(gameMode==="4p-2v2"){ctx.font="10px monospace";ctx.fillStyle="#555";ctx.fillText("FRIENDLY FIRE: "+(friendlyFire?"ON":"OFF"),W/2,H-6);}
-    // Gun game weapon labels per player
+    // Gun game weapon labels per player (with ammo count)
     if(gameType==="gungame"){
       ctx.font="bold 9px monospace";
       g.players.forEach((p,i)=>{
@@ -2735,6 +2743,11 @@ function startGameLoop(){
         const ggw=GG_WEAPONS[p.ggLevel];
         ctx.fillStyle=ggw.color||p.color;ctx.textAlign="center";
         ctx.fillText(ggw.name,p.x+PW/2,p.y-36);
+        const ratio=p.ammo/ggw.ammo;
+        ctx.fillStyle=p.reloading?"#888":(ratio>=1?"#ffcc00":(ratio<0.25?"#ff4444":"#fff"));
+        ctx.font="8px monospace";
+        ctx.fillText(p.reloading?"RELOADING":(p.ammo+"/"+ggw.ammo),p.x+PW/2,p.y-26);
+        ctx.font="bold 9px monospace";
       });
     }
     // VS overlay
@@ -4059,6 +4072,15 @@ function startStoryLoop(){
       else{ctx.font="7px monospace";ctx.fillStyle="#888";ctx.fillText("DEAD",35,hpY+7);}
       // Grenade count
       if(!sp.dead){ctx.font="8px monospace";ctx.fillStyle="#557733";ctx.textAlign="left";ctx.fillText("\u{1F4A3}"+sp.grenadeAmmo,105,hpY+7);}
+      // Weapon name + ammo count
+      if(!sp.dead){
+        const wpDef=GG_WEAPONS[sp.weapon],maxA=wpDef.ammo,ratio=sp.ammo/maxA;
+        const ammoCol=sp.reloading?"#888":(ratio>=1?"#ffcc00":(ratio<0.25?"#ff4444":"#fff"));
+        ctx.font="bold 8px monospace";ctx.fillStyle=wpDef.color||"#fff";ctx.textAlign="left";
+        ctx.fillText(wpDef.name,130,hpY+7);
+        ctx.fillStyle=ammoCol;
+        ctx.fillText(sp.reloading?"...":(sp.ammo+"/"+maxA),130+wpDef.name.length*5+6,hpY+7);
+      }
     });
     ctx.font="bold 14px monospace";
     // Coins
@@ -4096,10 +4118,12 @@ function startStoryLoop(){
         // Weapon name
         ctx.font="bold 7px monospace";ctx.fillStyle=selected?"#fff":ggw.color||"#888";ctx.textAlign="center";
         ctx.fillText(ggw.name,slotX+22,slotY+8);
-        // Ammo count (only for selected weapon)
+        // Ammo count (only for selected weapon, color-coded)
         if(selected){
-          ctx.font="7px monospace";ctx.fillStyle="#ffcc00";
-          ctx.fillText(sp.ammo+"/"+ggw.ammo,slotX+22,slotY+17);
+          ctx.font="7px monospace";
+          const ratio=sp.ammo/ggw.ammo;
+          ctx.fillStyle=sp.reloading?"#888":(ratio>=1?"#ffcc00":(ratio<0.25?"#ff4444":"#fff"));
+          ctx.fillText(sp.reloading?"RELOADING":(sp.ammo+"/"+ggw.ammo),slotX+22,slotY+17);
         }
       });
       // Grenade count
