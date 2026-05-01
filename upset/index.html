@@ -691,8 +691,8 @@ const STORY_STAGES=[
    ropes:[{anchorX:850,anchorY:40,length:200},{anchorX:2950,anchorY:40,length:200},{anchorX:3400,anchorY:40,length:200}],
    healthPickups:[{x:1100,y:280},{x:2500,y:GND-20},{x:4100,y:GND-20}],
    ammoCrates:[{x:1250,y:GND-30},{x:2580,y:GND-30},{x:4150,y:GND-30}],
-   checkpoint:4100,extraLife:null,
-   weaponPickups:[{x:600,y:280,weaponIdx:1},{x:2550,y:GND-40,weaponIdx:1}]
+   checkpoints:[2550,4100],extraLife:null,
+   weaponPickups:[{x:2550,y:GND-40,weaponIdx:1}]
   },
 
   {id:2,name:"THE DREADNOUGHT",width:1800,bg:"#1a1a2e",gnd:"#2a2a3e",gndLine:"#ff6644",platFill:"#3a3a4e",platTop:"#ff6644",platBot:"#0a0a1e",platSide:"#2a2a3e",
@@ -2885,7 +2885,7 @@ function loadStoryStage(num){
   storyState.breakableWalls=sd.breakableWalls?sd.breakableWalls.map(b=>({...b,hits:0,broken:false})):[];
   storyState.ropes=sd.ropes?sd.ropes.map(r=>({...r,angle:r.angle||0,angularVel:0,occupied:false,occupant:null})):[];
   storyState.extraLifePickups=sd.extraLife?[{...sd.extraLife,alive:true}]:[];
-  storyState.checkpoint=sd.checkpoint||null;storyState.lastCheckpoint=0;
+  storyState.checkpoints=sd.checkpoints||(sd.checkpoint?[sd.checkpoint]:[]);storyState.checkpoint=0;
   // Spawn enemies based on stage definition
   // Scale difficulty by player count: more players = tougher enemies
   const np=storyState.numPlayers;
@@ -3115,7 +3115,15 @@ function startStoryLoop(){
     ss.players.forEach(pl=>{if(!pl.dead&&pl.x<ss.cameraX)pl.x=ss.cameraX;});
 
     // Checkpoint
-    if(sd.checkpoint&&aliveSP.some(pl=>pl.x>sd.checkpoint)&&ss.lastCheckpoint<sd.checkpoint){ss.lastCheckpoint=sd.checkpoint;}
+    if(ss.checkpoints&&ss.checkpoints.length){
+      ss.checkpoints.forEach(cx=>{
+        if(cx>ss.checkpoint&&aliveSP.some(pl=>Math.abs(pl.x+PW/2-cx)<30)){
+          ss.checkpoint=cx;
+          ss.dmgNums.push({x:cx,y:GND-60,text:"CHECKPOINT!",color:"#44ff66",life:90,vy:-1.5});
+          SND.pickup();
+        }
+      });
+    }
 
     // Enemy update
     ss.enemies.forEach(e=>{
@@ -3603,7 +3611,28 @@ function startStoryLoop(){
     // Check total wipe — all players dead (not downed, fully dead)
     if(ss.players.every(dp=>dp.dead)&&!ss._gameOverTriggered){
       ss._gameOverTriggered=true;
-      setTimeout(()=>{MUSIC.stop();showScreen("gameover");renderStoryGameOver();startMenuPoll();},2000);
+      if(ss.lives>0){
+        // Respawn at last checkpoint
+        ss.lives--;
+        const sdRespawn=STORY_STAGES[ss.stage-1];
+        setTimeout(()=>{
+          if(!ss||ss.stageComplete)return;
+          const rx=ss.checkpoint||0;
+          ss.players.forEach((rp,rpi)=>{
+            rp.x=rx+rpi*30;rp.y=GND-PH;rp.vx=0;rp.vy=0;
+            rp.hp=rp.maxHp;rp.dead=false;rp.downed=false;
+            rp.invincible=120;rp.flash=0;rp.dashing=0;rp.frozen=0;
+            rp.ammo=GG_WEAPONS[rp.weapon].ammo;rp.reloading=false;
+            rp._onRope=false;rp.flipping=false;rp.flipAngle=0;
+          });
+          ss.cameraX=Math.max(0,Math.min(sdRespawn.width-W,rx-300));
+          ss.dmgNums.push({x:rx,y:GND-80,text:"RESPAWN",color:"#44ff66",life:60,vy:-1.5});
+          SND.revive();
+          ss._gameOverTriggered=false;
+        },1500);
+      }else{
+        setTimeout(()=>{MUSIC.stop();showScreen("gameover");renderStoryGameOver();startMenuPoll();},2000);
+      }
     }
 
     // Stage complete check
