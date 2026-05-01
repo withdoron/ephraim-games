@@ -3694,7 +3694,7 @@ function startStoryLoop(){
       if(e.dead||!e.spawned)return;
       const ex=e.x-cam;if(ex>W+50||ex<-50)return;
       const fadeWalkIn=e.walkingIn&&e.type==="stalker";
-      if(fadeWalkIn)ctx.globalAlpha=0.5;
+      ctx.globalAlpha=fadeWalkIn?0.5:1;
       const variantColor=e.variant==="gold"?"#ffcc22":e.variant==="red"?"#cc3333":e.color;
       const c=e.flash>0?"#fff":variantColor;
       // Draw enemy — alien bug style inspired by reference
@@ -3808,7 +3808,7 @@ function startStoryLoop(){
         ctx.fillStyle="#44ff44";ctx.fillRect(ex,e.y-10,e.w*(e.hp/e.maxHp),4);
         ctx.strokeStyle="rgba(255,255,255,0.1)";ctx.lineWidth=1;ctx.strokeRect(ex,e.y-10,e.w,4);
       }
-      if(fadeWalkIn)ctx.globalAlpha=1;
+      ctx.globalAlpha=1;
     });
 
     // Boss
