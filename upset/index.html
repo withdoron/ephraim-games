@@ -195,6 +195,41 @@ function drawStageBG(ctx,stageName,cameraX,stageData){
         }
       }
     }
+    // Floor 5 exit (daylight + ramp visual after x=8500)
+    if(cameraX>8500){
+      const exitWX=9000-cameraX;
+      // Daylight glow radiating from the exit
+      if(exitWX>=-200&&exitWX<W+300){
+        const glowGrad=ctx.createRadialGradient(exitWX-30,GND-130,30,exitWX-30,GND-130,360);
+        glowGrad.addColorStop(0,"rgba(255,245,190,0.45)");
+        glowGrad.addColorStop(0.45,"rgba(255,225,150,0.18)");
+        glowGrad.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.fillStyle=glowGrad;ctx.fillRect(exitWX-360,0,720,GND);
+        // Bright vertical stripe at the exit edge
+        const edgeGrad=ctx.createLinearGradient(exitWX-30,0,exitWX,0);
+        edgeGrad.addColorStop(0,"rgba(255,250,200,0)");
+        edgeGrad.addColorStop(1,"rgba(255,250,200,0.6)");
+        ctx.fillStyle=edgeGrad;ctx.fillRect(exitWX-30,0,30,GND);
+        // Drifting dust motes carried by the outside light
+        const motePhase=(frame*0.8)%240;
+        for(let i=0;i<10;i++){
+          const mx=exitWX-30-((motePhase+i*28)%220);
+          const my=70+i*32+Math.sin(frame*0.025+i)*18;
+          if(mx>0&&mx<W){
+            ctx.fillStyle=`rgba(255,250,200,${0.25+Math.sin(frame*0.06+i)*0.18})`;
+            ctx.fillRect(mx,my,2,2);
+          }
+        }
+      }
+      // Visual ramp shape at 8800-9000 (collision is still flat ground)
+      const rsX=8800-cameraX,reX=9000-cameraX;
+      if(reX>0&&rsX<W){
+        ctx.fillStyle="#3a3a4e";
+        ctx.beginPath();ctx.moveTo(rsX,GND);ctx.lineTo(reX,GND-110);ctx.lineTo(reX,GND);ctx.closePath();ctx.fill();
+        ctx.strokeStyle="#888";ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(rsX,GND);ctx.lineTo(reX,GND-110);ctx.stroke();
+      }
+    }
     // Signs
     if(stageData.signs){stageData.signs.forEach(s=>{
       const sx=s.x-cameraX;if(sx<-120||sx>W+120)return;
@@ -658,16 +693,17 @@ const GG_WEAPONS=[
 // Story mode data
 const STORY_STAGES=[
   // ===== STAGE 1: MILITARY BASE — FLOOR 1 =====
-  {id:1,name:"MILITARY BASE",width:7000,bg:"#000",gnd:"#1a1a2e",gndLine:"#3a3a42",platFill:"#3a3a4e",platTop:"#555",platBot:"#1a1a2e",platSide:"#2a2a3e",
+  {id:1,name:"MILITARY BASE",width:9000,bg:"#000",gnd:"#1a1a2e",gndLine:"#3a3a42",platFill:"#3a3a4e",platTop:"#555",platBot:"#1a1a2e",platSide:"#2a2a3e",
    indoor:true,
    signs:[
      {x:100,text:"ESCAPE THE BASE!",color:"#ff4466"},
      {x:680,text:"GRAB THE ROPE",color:"#ffcc00"},
      {x:2500,text:"ARMORY",color:"#ffcc00"},
      {x:3300,text:"CAFETERIA",color:"#ffcc00",damaged:true},
-     {x:5100,text:"WORKSHOP",color:"#ffcc00",damaged:true}
+     {x:5100,text:"WORKSHOP",color:"#ffcc00",damaged:true},
+     {x:8200,text:"EXIT \u2192",color:"#ffcc00",damaged:true}
    ],
-   groundSections:[{startX:0,endX:700},{startX:1050,endX:2850},{startX:3100,endX:6900}],
+   groundSections:[{startX:0,endX:700},{startX:1050,endX:2850},{startX:3100,endX:6900},{startX:7000,endX:9000}],
    enemies:[
      {type:"stalker",x:420},{type:"stalker",x:520},
      {type:"tank",x:550},{type:"rusher",x:650},
@@ -681,7 +717,12 @@ const STORY_STAGES=[
      {type:"stalker",x:5200},{type:"rusher",x:5500},
      {type:"flyer",x:5900},{type:"stalker",x:6100},
      {type:"tank",x:6300},{type:"tank",x:6450},
-     {type:"grunt",x:6800}
+     {type:"grunt",x:6800},
+     // ===== Floor 5 (Last Hallway) =====
+     {type:"grunt",x:7100},{type:"stalker",x:7300},
+     {type:"stalker",x:7900,y:GND-80}, // ON the mid-pit platform — stationary turret-style
+     {type:"stalker",x:8400},
+     {type:"tank",x:8550},{type:"rusher",x:8700}
    ],
    plats:[
      {x:400,y:GND-80,w:80,h:14},{x:500,y:GND-110,w:80,h:14},{x:600,y:GND-60,w:60,h:14},
@@ -694,15 +735,19 @@ const STORY_STAGES=[
      // ===== Floor 4 platforms =====
      {x:5350,y:GND-70,w:60,h:14},{x:5550,y:GND-90,w:80,h:14},
      {x:6050,y:GND-100,w:70,h:14},{x:6200,y:GND-80,w:60,h:14},
-     {x:6600,y:GND-90,w:80,h:14},{x:6750,y:GND-70,w:60,h:14}
+     {x:6600,y:GND-90,w:80,h:14},{x:6750,y:GND-70,w:60,h:14},
+     // ===== Floor 5 platforms =====
+     {x:7150,y:GND-70,w:60,h:14},{x:7250,y:GND-100,w:60,h:14},
+     {x:7900,y:GND-80,w:60,h:14}, // mid-pit platform (Stalker stands here)
+     {x:8350,y:GND-80,w:80,h:14},{x:8500,y:GND-60,w:60,h:14}
    ],
    movingPlats:[{x:5650,y:GND-60,w:80,h:14,axis:"h",speed:1.5,minX:5650,maxX:5850}],
    acidPools:[{x:200,y:GND,w:80},{x:1600,y:GND,w:60},{x:3350,y:GND,w:150},{x:6500,y:GND,w:80}],
-   spikes:[{x:700,y:GND-16,w:350,h:16},{x:2850,y:GND-16,w:250,h:16},{x:3250,y:GND-16,w:80,h:16},{x:5400,y:GND-16,w:60,h:16},{x:5800,y:GND-16,w:200,h:16,damage:50}],
-   ropes:[{anchorX:850,anchorY:40,length:200},{anchorX:2950,anchorY:40,length:200},{anchorX:3400,anchorY:40,length:200}],
+   spikes:[{x:700,y:GND-16,w:350,h:16},{x:2850,y:GND-16,w:250,h:16},{x:3250,y:GND-16,w:80,h:16},{x:5400,y:GND-16,w:60,h:16},{x:5800,y:GND-16,w:200,h:16,damage:50},{x:7400,y:GND-16,w:900,h:16,damage:50}],
+   ropes:[{anchorX:850,anchorY:40,length:200},{anchorX:2950,anchorY:40,length:200},{anchorX:3400,anchorY:40,length:200},{anchorX:7600,anchorY:40,length:200},{anchorX:7950,anchorY:40,length:200},{anchorX:8200,anchorY:40,length:200}],
    healthPickups:[{x:1100,y:280},{x:2500,y:GND-20},{x:4100,y:GND-20},{x:4150,y:GND-20},{x:5300,y:GND-20}],
    ammoCrates:[{x:1250,y:GND-30},{x:2580,y:GND-30},{x:4150,y:GND-30}],
-   checkpoints:[2550,4100,6700],extraLife:null,
+   checkpoints:[2550,4100,6700,8400],extraLife:null,
    weaponPickups:[{x:2550,y:GND-40,weaponIdx:1}]
   },
 
@@ -2921,19 +2966,23 @@ function loadStoryStage(num){
   const dmgScale=np===1?1:np===2?1.2:1.4; // 20% more damage per extra player
   sd.enemies.forEach(e=>{
     const def=ENEMY_DEFS[e.type];
-    const spawnY=def.flying?150+Math.random()*100:GND-def.h;
     // Variant roll: 60% normal, 30% red (enraged), 10% gold (treasure)
     const roll=Math.random();
     let variant="normal",vHpMult=1,vDmgMult=1,vSpdMult=1,vCoinMult=1,vSizeMult=1;
     if(roll>0.9){variant="gold";vHpMult=1.5;vCoinMult=3;vSizeMult=1.15;}
     else if(roll>0.6){variant="red";vHpMult=1.3;vDmgMult=1.3;vSpdMult=1.4;vSizeMult=1.1;}
+    const actualW=Math.round(def.w*vSizeMult),actualH=Math.round(def.h*vSizeMult);
+    // Fixed-y enemies (e.g. perched on a small platform): user's y = platform top.
+    // Subtract the enemy's height so the bottom rests on the platform top, not overlapping it from below.
+    const hasFixedY=e.y!==undefined&&!def.flying;
+    const spawnY=hasFixedY?(e.y-actualH):(def.flying?150+Math.random()*100:GND-def.h);
     const scaledHp=Math.round(def.hp*hpScale*vHpMult),scaledDmg=Math.round((def.damage||5)*dmgScale*vDmgMult);
     const vSpeed=Math.round((def.speed||1)*vSpdMult*10)/10;
     const vCoins=Math.round((def.coins||5)*vCoinMult);
     storyState.enemies.push({type:e.type,...def,speed:vSpeed,damage:scaledDmg,coins:vCoins,
-      x:e.x,y:spawnY,spawnX:e.x,preSpawn:true,walkingIn:false,vx:0,vy:0,hp:scaledHp,maxHp:scaledHp,
-      w:Math.round(def.w*vSizeMult),h:Math.round(def.h*vSizeMult),
-      variant,facing:-1,lastShot:0,spawned:false,dead:false,flash:0,ai:{state:"idle",timer:0}});
+      x:e.x,y:spawnY,spawnX:e.x,preSpawn:!hasFixedY,walkingIn:false,vx:0,vy:0,hp:scaledHp,maxHp:scaledHp,
+      w:actualW,h:actualH,
+      variant,facing:-1,lastShot:0,spawned:hasFixedY,stationary:hasFixedY,dead:false,flash:0,ai:{state:"idle",timer:0}});
   });
   // Boss
   if(sd.boss){
@@ -3195,7 +3244,14 @@ function startStoryLoop(){
       const dx=closestP.x-e.x,dist=Math.abs(dx);
       e.facing=dx>0?1:-1;
       // AI by type
-      if(e.type==="grunt"){
+      if(e.stationary){
+        // Held in position (e.g. perched on a small platform). Only ranged attacks.
+        e.vx=0;
+        if(e.ranged&&now-e.lastShot>e.fireRate&&dist<400){
+          ss.enemyBullets.push({x:e.x+e.w/2+e.facing*10,y:e.y+e.h/2,vx:e.bulletSpeed*e.facing,vy:0,damage:e.damage,friendly:false,sz:3});
+          e.lastShot=now;
+        }
+      }else if(e.type==="grunt"){
         if(dist>200){e.vx=e.speed*e.facing;}else{e.vx=0;
           if(e.ranged&&now-e.lastShot>e.fireRate){
             ss.enemyBullets.push({x:e.x+e.w/2+e.facing*10,y:e.y+e.h/2,vx:e.bulletSpeed*e.facing,vy:0,damage:e.damage,friendly:false,sz:3});
@@ -3290,6 +3346,9 @@ function startStoryLoop(){
         if(e.x+e.w>sd.width){e.x=sd.width-e.w;e.vx=-Math.abs(e.vx);}
         if(e.y+e.h>GND)e.y=GND-e.h;
         if(e.y<10)e.y=10;
+      }else if(e.stationary){
+        // Held in place — no movement, no gravity, no platform interaction
+        e.vx=0;e.vy=0;
       }else{
         e.vy=(e.vy||0)+GRAVITY;e.x+=e.vx;e.y+=e.vy;
         if(e.y+e.h>=GND){e.y=GND-e.h;e.vy=0;}
@@ -3308,8 +3367,8 @@ function startStoryLoop(){
           }});
         for(let c=0;c<e.coins;c++)ss.coins_on_ground.push({x:e.x+e.w/2+(Math.random()-0.5)*20,y:e.y,vy:-3-Math.random()*3,vx:(Math.random()-0.5)*3,grounded:false});
       }
-      // Platform collision (non-bombers only)
-      if(e.type!=="bomber"){
+      // Platform collision (non-bombers, non-stationary only)
+      if(e.type!=="bomber"&&!e.stationary){
       plats.forEach(pl=>{
         if(e.x+e.w>pl.x&&e.x<pl.x+pl.w&&e.y+e.h>pl.y&&e.y<pl.y+pl.h){
           const oT=e.y+e.h-pl.y,oB=pl.y+pl.h-e.y,oL=e.x+e.w-pl.x,oR=pl.x+pl.w-e.x;
