@@ -2,7 +2,7 @@
 
 ## About
 
-This repo contains games designed by Ephraim (age 12) and built with AI assistance. Ephraim is the lead designer — he decides what gets built. Claude writes the code.
+This repo contains games designed by Ephraim (age 13) and built with AI assistance. Ephraim is the lead designer — he decides what gets built. Claude writes the code.
 
 ## Project Structure
 
